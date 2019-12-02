@@ -17,21 +17,23 @@ class Bow(pygame.sprite.Sprite):
     It can shoot arrows.
     '''
 
-    IMG_UNBENT = pygame.image.load('resources/bow1.png')
+    IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
     IMG_BENT = pygame.image.load('resources/bow2.png')
-    SPEED = [0, 5]
+    SPEED = [0, 8]
+    INSTANCES = pygame.sprite.Group()
 
     def __init__(self):
         '''
         Create a Bow.
         '''
         super().__init__()
-        self._img = Bow.IMG_UNBENT
+        self._img = Bow.IMG_STRAIGHT
         self._rect = self._img.get_rect()
         self._rect.move_ip(20, 0)
         self._bent = False
         self._speed = Bow.SPEED.copy()
         self._arrow = Arrow
+        Bow.INSTANCES.add(self)
 
     def update(self):
         '''
@@ -54,8 +56,27 @@ class Bow(pygame.sprite.Sprite):
         is shot.
         '''
         self._bent = False
-        self._img = Bow.IMG_UNBENT
+        self._img = Bow.IMG_STRAIGHT
         self._arrow(self._rect)
+
+    @property
+    def image(self):
+        return self._img
+
+    @property
+    def rect(self):
+        return self._rect
+
+    @classmethod
+    def init(cls):
+        '''
+        Initialize pictures that represent an instance of Bow onscreen. Not to
+        be called before pygame image module has been initialized.
+        '''
+        cls.IMG_STRAIGHT.set_colorkey(cls.IMG_STRAIGHT.get_at((0, 0)))
+        cls.IMG_STRAIGHT = cls.IMG_STRAIGHT.convert()
+        cls.IMG_BENT.set_colorkey(cls.IMG_BENT.get_at((0, 0)))
+        cls.IMG_BENT = cls.IMG_BENT.convert()
 
 
 class Arrow(pygame.sprite.Sprite):
@@ -65,7 +86,7 @@ class Arrow(pygame.sprite.Sprite):
     beyond the screen's boundaries.
     '''
     IMG = pygame.image.load('resources/arrow.png')
-    SPEED = [10, 0]
+    SPEED = [15, 0]
     INSTANCES = pygame.sprite.Group()
 
     def __init__(self, bow_rect):
@@ -80,20 +101,20 @@ class Arrow(pygame.sprite.Sprite):
         Arrow.INSTANCES.add(self)
 
     def update(self):
+        '''
+        Update a moving arrow's position.
+        '''
         self._rect.move_ip(self._speed)
         if self._rect.x > SCREEN_WIDTH:
             super().kill()
 
-    def __del__(self):
-        print('arrow deleted')
-
     @property
     def image(self):
-        return self._img.copy()
+        return self._img
 
     @property
     def rect(self):
-        return self._rect.copy()
+        return self._rect
 
     @classmethod
     def init(cls):
@@ -102,16 +123,36 @@ class Arrow(pygame.sprite.Sprite):
         in here require pygame's image module to be initialized, this class
         method should not be called before pygame.init().
         '''
-        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
         cls.IMG = cls.IMG.convert()
+        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
-    @classmethod
-    def draw(cls, screen):
-        cls.INSTANCES.draw(screen)
 
-    @classmethod
-    def update_group(cls):
-        cls.INSTANCES.update()
+class DisplayGroup(pygame.sprite.Group):
+    '''
+    Class whose purpose is to draw every game object on the screen.
+    '''
+
+    def __init__(self, screen, background, *groups):
+        '''
+        Initialize a display group. groups are expected to be pygame.sprite.Group,
+        or subclass.
+        '''
+        self._screen = screen
+        self._background = background
+        super().__init__()
+        self._groups = groups
+        for group in self._groups:
+            super().add(group.sprites())
+
+    def update_draw(self):
+        for group in self._groups:
+            for sprite in group.sprites():
+                if sprite not in self:
+                    super().add(sprite) 
+        super().clear(self._screen, self._background)
+        super().update()
+        super().draw(self._screen)
+
 
 class Target:
     pass
@@ -123,11 +164,20 @@ if __name__ == '__main__':
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
-    fps = 40
-    bow = Bow()
+    fps = 30
+    background = pygame.image.load('resources/background.png')
+
+    # Bow and Arrow init
+    Bow.init()
     Arrow.init()
+    # Bow instanciation
+    bow = Bow()
+    onscreen_sprites = DisplayGroup(screen,
+                                    background,
+                                    Bow.INSTANCES, Arrow.INSTANCES)
+
+    screen.blit(background, (0, 0))
     while True:
-        screen.fill((0, 0, 0))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -138,9 +188,6 @@ if __name__ == '__main__':
             elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_SPACE:
                     bow.shoot()
-        bow.update()
-        screen.blit(bow._img, bow._rect)
-        Arrow.update_group()
-        Arrow.draw(screen)
+        onscreen_sprites.update_draw()
         pygame.display.flip()
         clock.tick(fps)
