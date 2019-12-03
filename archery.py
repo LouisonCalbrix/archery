@@ -88,6 +88,8 @@ class Arrow(pygame.sprite.Sprite):
     IMG = pygame.image.load('resources/arrow.png')
     SPEED = [15, 0]
     INSTANCES = pygame.sprite.Group()
+    HITBOX_OFFSET = (165, 90)
+    HITBOX_SIZE = (26, 17)
 
     def __init__(self, bow_rect):
         '''
@@ -98,6 +100,8 @@ class Arrow(pygame.sprite.Sprite):
         self._img = Arrow.IMG
         self._rect = bow_rect.copy()
         self._speed = Arrow.SPEED
+        x, y = self._rect.x, self._rect.y
+        self._hitbox = pygame.Rect((x, y), Arrow.HITBOX_SIZE)
         Arrow.INSTANCES.add(self)
 
     def update(self):
@@ -105,6 +109,7 @@ class Arrow(pygame.sprite.Sprite):
         Update a moving arrow's position.
         '''
         self._rect.move_ip(self._speed)
+        self._hitbox.move_ip(self._speed)
         if self._rect.x > SCREEN_WIDTH:
             super().kill()
 
