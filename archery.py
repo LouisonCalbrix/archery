@@ -20,7 +20,7 @@ class Bow(pygame.sprite.Sprite):
     IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
     IMG_BENT = pygame.image.load('resources/bow2.png')
     SPEED = [0, 8]
-    INSTANCES = pygame.sprite.Group()
+    INSTANCE = pygame.sprite.GroupSingle()
 
     def __init__(self):
         '''
@@ -33,7 +33,7 @@ class Bow(pygame.sprite.Sprite):
         self._bent = False
         self._speed = Bow.SPEED.copy()
         self._arrow = Arrow
-        Bow.INSTANCES.add(self)
+        Bow.INSTANCE.add(self)
 
     def update(self):
         '''
@@ -132,7 +132,58 @@ class Arrow(pygame.sprite.Sprite):
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
-class DisplayGroup(pygame.sprite.Group):
+class Target(pygame.sprite.Sprite):
+    '''
+    Target that needs to be hit.
+    '''
+    OUTER_I = 2
+    MIDDLE_I = 1
+    INNER_I = 0
+    AREAS = [
+        ((79, 127), (26, 153)),
+        ((88, 59), (34, 289)),
+        ((88, 0), (42, 399))
+    ]
+    IMG = pygame.image.load('resources/target.png')
+    INSTANCE = pygame.sprite.GroupSingle()
+
+    def __init__(self):
+        '''
+        '''
+        super().__init__()
+        self._img = Target.IMG
+        self._rect = self._img.get_rect()
+        self._rect.x = SCREEN_WIDTH - self._img.get_width()
+        self._rect.y = SCREEN_HEIGHT - self._img.get_height()
+        x, y = self._rect.x, self._rect.y
+
+#        inner = Target.AREAS[INNER_I]
+#        inner_hit = pygame.Rect(inner[0], inner[1])
+#        middle = Target.AREAS[MIDDLE_I]
+#        middle_hit = pygame.Rect(middle[0], middle[1])
+#        outer = Target.AREAS[OUTER_I]
+#        outer_hit = pygame.Rect(outer[0], outer[1])
+        Target.INSTANCE.add(self)
+
+    @property
+    def image(self):
+        return self._img
+
+    @property
+    def rect(self):
+        return self._rect
+
+    @classmethod
+    def init(cls):
+        '''
+        Initialize pictures that represent an instance of Target onscreen. Not to
+        be called before pygame image module has been initialized.
+        '''
+        cls.IMG = cls.IMG.convert()
+        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
+
+
+class DisplayGroup(pygame.sprite.OrderedUpdates):
     '''
     Class whose purpose is to draw every game object on the screen.
     '''
@@ -142,9 +193,9 @@ class DisplayGroup(pygame.sprite.Group):
         Initialize a display group. groups are expected to be pygame.sprite.Group,
         or subclass.
         '''
+        super().__init__()
         self._screen = screen
         self._background = background
-        super().__init__()
         self._groups = groups
         for group in self._groups:
             super().add(group.sprites())
@@ -159,9 +210,6 @@ class DisplayGroup(pygame.sprite.Group):
         super().draw(self._screen)
 
 
-class Target:
-    pass
-
 # for test purpose
 if __name__ == '__main__':
     
@@ -175,11 +223,13 @@ if __name__ == '__main__':
     # Bow and Arrow init
     Bow.init()
     Arrow.init()
+    Target.init()
     # Bow instanciation
     bow = Bow()
+    target = Target()
     onscreen_sprites = DisplayGroup(screen,
                                     background,
-                                    Bow.INSTANCES, Arrow.INSTANCES)
+                                    Bow.INSTANCE, Target.INSTANCE, Arrow.INSTANCES)
 
     screen.blit(background, (0, 0))
     while True:
