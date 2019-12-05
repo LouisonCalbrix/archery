@@ -10,6 +10,7 @@ import pygame
 
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
+SCORE_TABLE = [3, 2, 1]
 
 class Bow(pygame.sprite.Sprite):
     '''
@@ -86,6 +87,7 @@ class Arrow(pygame.sprite.Sprite):
     beyond the screen's boundaries.
     '''
     IMG = pygame.image.load('resources/arrow.png')
+    IMG_HIT = pygame.image.load('resources/arrow_stopped.png')
     SPEED = [15, 0]
     INSTANCES = pygame.sprite.Group()
     HITBOX_OFFSET = (165, 90)
@@ -101,7 +103,9 @@ class Arrow(pygame.sprite.Sprite):
         self._rect = bow_rect.copy()
         self._speed = Arrow.SPEED
         x, y = self._rect.x, self._rect.y
-        self._hitbox = pygame.Rect((x, y), Arrow.HITBOX_SIZE)
+        hit_coords = [coord+offset for coord, offset in zip((x, y), Arrow.HITBOX_OFFSET)]
+        self._hitbox = pygame.Rect(hit_coords, Arrow.HITBOX_SIZE)
+        self._target = Target.INSTANCE.sprite
         Arrow.INSTANCES.add(self)
 
     def update(self):
@@ -112,6 +116,11 @@ class Arrow(pygame.sprite.Sprite):
         self._hitbox.move_ip(self._speed)
         if self._rect.x > SCREEN_WIDTH:
             super().kill()
+        hit = self._hitbox.collidelist(self._target.hitbox)
+        if hit != -1:
+            self._speed = [0, 0]
+            self._img = Arrow.IMG_HIT
+            self._score = SCORE_TABLE[hit]
 
     @property
     def image(self):
@@ -130,6 +139,8 @@ class Arrow(pygame.sprite.Sprite):
         '''
         cls.IMG = cls.IMG.convert()
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
+        cls.IMG_HIT = cls.IMG_HIT.convert()
+        cls.IMG_HIT.set_colorkey(cls.IMG_HIT.get_at((0, 0)))
 
 
 class Target(pygame.sprite.Sprite):
@@ -157,12 +168,15 @@ class Target(pygame.sprite.Sprite):
         self._rect.y = SCREEN_HEIGHT - self._img.get_height()
         x, y = self._rect.x, self._rect.y
 
-#        inner = Target.AREAS[INNER_I]
-#        inner_hit = pygame.Rect(inner[0], inner[1])
-#        middle = Target.AREAS[MIDDLE_I]
-#        middle_hit = pygame.Rect(middle[0], middle[1])
-#        outer = Target.AREAS[OUTER_I]
-#        outer_hit = pygame.Rect(outer[0], outer[1])
+        inner = Target.AREAS[Target.INNER_I]
+        self._inner_hit = pygame.Rect(inner[0], inner[1])
+        self._inner_hit.move_ip(x, y)
+        middle = Target.AREAS[Target.MIDDLE_I]
+        self._middle_hit = pygame.Rect(middle[0], middle[1])
+        self._middle_hit.move_ip(x, y)
+        outer = Target.AREAS[Target.OUTER_I]
+        self._outer_hit = pygame.Rect(outer[0], outer[1])
+        self._outer_hit.move_ip(x, y)
         Target.INSTANCE.add(self)
 
     @property
@@ -172,6 +186,10 @@ class Target(pygame.sprite.Sprite):
     @property
     def rect(self):
         return self._rect
+
+    @property
+    def hitbox(self):
+        return self._inner_hit, self._middle_hit, self._outer_hit
 
     @classmethod
     def init(cls):
