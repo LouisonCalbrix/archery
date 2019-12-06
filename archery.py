@@ -19,27 +19,31 @@ class Bow(pygame.sprite.Sprite):
     It can shoot arrows.
     '''
 
-    IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
-    IMG_BENT = pygame.image.load('resources/bow2.png')
-    TIME_COOLDOWN_S = 2
+#    IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
+#    IMG_BENT = pygame.image.load('resources/bow2.png')
+    IMG = pygame.image.load('resources/bow.png')
+    ROPE_TOP = (54, 20)
+    ROPE_BOT = (54, 180)
+    ROPE_STATES = 5
     SPEED = [0, 8]
-    INSTANCE = pygame.sprite.GroupSingle()
     FORCE_MIN = 10
     FORCE_MAX = 50
     TIME_FORCE_S = 2
+    TIME_COOLDOWN_S = 2
+    INSTANCE = pygame.sprite.GroupSingle()
 
     def __init__(self):
         '''
         Create a Bow.
         '''
         super().__init__()
-        self._img = Bow.IMG_STRAIGHT
+#        self._img = Bow.IMG_STRAIGHT
+        self.draw(0)
         self._rect = self._img.get_rect()
         self._rect.move_ip(20, 0)
-        self._bent = False
+        self._bent_time = 0
         self._cooldown = 0
         self._speed = Bow.SPEED.copy()
-        self._bent_time = 0
         self._arrow = Arrow
         Bow.INSTANCE.add(self)
 
@@ -52,28 +56,49 @@ class Bow(pygame.sprite.Sprite):
             self._speed = [-speed_component for speed_component in self._speed]
         if self._cooldown:
             self._cooldown -= 1
-        if self._bent and self._bent_time < Bow.TIME_FORCE_FPS:
+            if self._cooldown == 0:
+                self.draw(0)
+        if 0 < self._bent_time < Bow.TIME_FORCE_FPS:
             self._bent_time += 1
+            step = self._bent_time / (Bow.TIME_FORCE_FPS // Bow.ROPE_STATES)
+            if step.is_integer():
+                self.draw(step)
 
     def bend(self):
         '''
         Bend the bow, a bow needs to be bent to shoot an arrow.
         '''
         if not self._cooldown:
-            self._bent = True
-            self._img = Bow.IMG_BENT
+            self._bent_time += 1
 
     def shoot(self):
         '''
         Shoot an arrow, when the pressure of a bent bow is release, an arrow
         is shot.
         '''
-        if self._bent:
-            self._bent = False
-            self._img = Bow.IMG_STRAIGHT
+        if self._bent_time:
             self._arrow(self._rect, self.force)
             self._bent_time = 0
             self._cooldown = Bow.TIME_COOLDOWN_FPS
+            self.draw(-1)
+
+    def draw(self, step):
+        '''
+        Draw the bow, only to be called when the bow's state changes.
+        '''
+        self._img = Bow.IMG.copy()
+        overlay = pygame.Surface(Bow.IMG.get_size())
+        if step == -1:
+            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_TOP, Bow.ROPE_BOT)
+        else:
+            base_x = Bow.ROPE_TOP[0]
+            x = base_x * (1 - step / Bow.ROPE_STATES)
+            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_TOP, (x, Bow.ROPE_MIDDLE))
+            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_BOT, (x, Bow.ROPE_MIDDLE))
+            overlay.blit(Arrow.IMG, (x - base_x, 0))
+        overlay.set_colorkey(overlay.get_at((0, 0)))
+        self._img.blit(overlay, (0, 0))
+
 
     @property
     def force(self):
@@ -93,13 +118,16 @@ class Bow(pygame.sprite.Sprite):
         Initialize pictures that represent an instance of Bow onscreen. Not to
         be called before pygame image module has been initialized.
         '''
-        cls.IMG_STRAIGHT.set_colorkey(cls.IMG_STRAIGHT.get_at((0, 0)))
-        cls.IMG_STRAIGHT = cls.IMG_STRAIGHT.convert()
-        cls.IMG_BENT.set_colorkey(cls.IMG_BENT.get_at((0, 0)))
-        cls.IMG_BENT = cls.IMG_BENT.convert()
+#        cls.IMG_STRAIGHT.set_colorkey(cls.IMG_STRAIGHT.get_at((0, 0)))
+#        cls.IMG_STRAIGHT = cls.IMG_STRAIGHT.convert()
+#        cls.IMG_BENT.set_colorkey(cls.IMG_BENT.get_at((0, 0)))
+#        cls.IMG_BENT = cls.IMG_BENT.convert()
+        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
+        cls.IMG = cls.IMG.convert()
         cls.FPS = fps
         cls.TIME_COOLDOWN_FPS = cls.TIME_COOLDOWN_S * cls.FPS
         cls.TIME_FORCE_FPS = cls.TIME_FORCE_S * cls.FPS
+        cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
 class Arrow(pygame.sprite.Sprite):
