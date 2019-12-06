@@ -11,6 +11,7 @@ import pygame
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
 SCORE_TABLE = [3, 2, 1]
+GRAVITY = 15
 
 class Bow(pygame.sprite.Sprite):
     '''
@@ -20,8 +21,12 @@ class Bow(pygame.sprite.Sprite):
 
     IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
     IMG_BENT = pygame.image.load('resources/bow2.png')
+    TIME_COOLDOWN_S = 2
     SPEED = [0, 8]
     INSTANCE = pygame.sprite.GroupSingle()
+    FORCE_MIN = 10
+    FORCE_MAX = 50
+    TIME_FORCE_S = 2
 
     def __init__(self):
         '''
@@ -32,33 +37,47 @@ class Bow(pygame.sprite.Sprite):
         self._rect = self._img.get_rect()
         self._rect.move_ip(20, 0)
         self._bent = False
+        self._cooldown = 0
         self._speed = Bow.SPEED.copy()
+        self._bent_time = 0
         self._arrow = Arrow
         Bow.INSTANCE.add(self)
 
     def update(self):
         '''
-        Update bow's position, and whether or not an arrow is shot.
+        Update bow's position and potentially handle the cooldown.
         '''
         self._rect.move_ip(*self._speed)
         if self._rect.y < 0 or self._rect.y > SCREEN_HEIGHT-self._rect.height:
             self._speed = [-speed_component for speed_component in self._speed]
+        if self._cooldown:
+            self._cooldown -= 1
+        if self._bent and self._bent_time < Bow.TIME_FORCE_FPS:
+            self._bent_time += 1
 
     def bend(self):
         '''
         Bend the bow, a bow needs to be bent to shoot an arrow.
         '''
-        self._bent = True
-        self._img = Bow.IMG_BENT
+        if not self._cooldown:
+            self._bent = True
+            self._img = Bow.IMG_BENT
 
     def shoot(self):
         '''
         Shoot an arrow, when the pressure of a bent bow is release, an arrow
         is shot.
         '''
-        self._bent = False
-        self._img = Bow.IMG_STRAIGHT
-        self._arrow(self._rect)
+        if self._bent:
+            self._bent = False
+            self._img = Bow.IMG_STRAIGHT
+            self._arrow(self._rect, self.force)
+            self._bent_time = 0
+            self._cooldown = Bow.TIME_COOLDOWN_FPS
+
+    @property
+    def force(self):
+        return ((Bow.FORCE_MAX-Bow.FORCE_MIN) / Bow.TIME_FORCE_FPS) * self._bent_time + Bow.FORCE_MIN
 
     @property
     def image(self):
@@ -69,7 +88,7 @@ class Bow(pygame.sprite.Sprite):
         return self._rect
 
     @classmethod
-    def init(cls):
+    def init(cls, fps):
         '''
         Initialize pictures that represent an instance of Bow onscreen. Not to
         be called before pygame image module has been initialized.
@@ -78,6 +97,9 @@ class Bow(pygame.sprite.Sprite):
         cls.IMG_STRAIGHT = cls.IMG_STRAIGHT.convert()
         cls.IMG_BENT.set_colorkey(cls.IMG_BENT.get_at((0, 0)))
         cls.IMG_BENT = cls.IMG_BENT.convert()
+        cls.FPS = fps
+        cls.TIME_COOLDOWN_FPS = cls.TIME_COOLDOWN_S * cls.FPS
+        cls.TIME_FORCE_FPS = cls.TIME_FORCE_S * cls.FPS
 
 
 class Arrow(pygame.sprite.Sprite):
@@ -93,15 +115,17 @@ class Arrow(pygame.sprite.Sprite):
     HITBOX_OFFSET = (165, 90)
     HITBOX_SIZE = (26, 17)
 
-    def __init__(self, bow_rect):
+    def __init__(self, bow_rect, force):
         '''
         Create an arrow that is shot by a bow whose position is represented by
         bow_rect.
         '''
+        print('shot arrow {}'.format(force))
         super().__init__()
         self._img = Arrow.IMG
         self._rect = bow_rect.copy()
-        self._speed = Arrow.SPEED
+        self._speed = [force, GRAVITY]
+#        self._speed = Arrow.SPEED
         x, y = self._rect.x, self._rect.y
         hit_coords = [coord+offset for coord, offset in zip((x, y), Arrow.HITBOX_OFFSET)]
         self._hitbox = pygame.Rect(hit_coords, Arrow.HITBOX_SIZE)
@@ -114,13 +138,17 @@ class Arrow(pygame.sprite.Sprite):
         '''
         self._rect.move_ip(self._speed)
         self._hitbox.move_ip(self._speed)
-        if self._rect.x > SCREEN_WIDTH:
+        if self._rect.x > SCREEN_WIDTH or self._rect.y > SCREEN_HEIGHT:
             super().kill()
         hit = self._hitbox.collidelist(self._target.hitbox)
         if hit != -1:
             self._speed = [0, 0]
             self._img = Arrow.IMG_HIT
             self._score = SCORE_TABLE[hit]
+
+    # test
+    def __del__(self):
+        print('deleted arrow')
 
     @property
     def image(self):
@@ -239,7 +267,7 @@ if __name__ == '__main__':
     background = pygame.image.load('resources/background.png')
 
     # Bow and Arrow init
-    Bow.init()
+    Bow.init(fps)
     Arrow.init()
     Target.init()
     # Bow instanciation
