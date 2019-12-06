@@ -11,7 +11,7 @@ import pygame
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
 SCORE_TABLE = [3, 2, 1]
-GRAVITY = 15
+GRAVITY = 3
 
 class Bow(pygame.sprite.Sprite):
     '''
@@ -19,8 +19,6 @@ class Bow(pygame.sprite.Sprite):
     It can shoot arrows.
     '''
 
-#    IMG_STRAIGHT = pygame.image.load('resources/bow1.png')
-#    IMG_BENT = pygame.image.load('resources/bow2.png')
     IMG = pygame.image.load('resources/bow.png')
     ROPE_TOP = (54, 20)
     ROPE_BOT = (54, 180)
@@ -37,7 +35,6 @@ class Bow(pygame.sprite.Sprite):
         Create a Bow.
         '''
         super().__init__()
-#        self._img = Bow.IMG_STRAIGHT
         self.draw(0)
         self._rect = self._img.get_rect()
         self._rect.move_ip(20, 0)
@@ -118,10 +115,6 @@ class Bow(pygame.sprite.Sprite):
         Initialize pictures that represent an instance of Bow onscreen. Not to
         be called before pygame image module has been initialized.
         '''
-#        cls.IMG_STRAIGHT.set_colorkey(cls.IMG_STRAIGHT.get_at((0, 0)))
-#        cls.IMG_STRAIGHT = cls.IMG_STRAIGHT.convert()
-#        cls.IMG_BENT.set_colorkey(cls.IMG_BENT.get_at((0, 0)))
-#        cls.IMG_BENT = cls.IMG_BENT.convert()
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
         cls.IMG = cls.IMG.convert()
         cls.FPS = fps
@@ -152,8 +145,7 @@ class Arrow(pygame.sprite.Sprite):
         super().__init__()
         self._img = Arrow.IMG
         self._rect = bow_rect.copy()
-        self._speed = [force, GRAVITY]
-#        self._speed = Arrow.SPEED
+        self._speed = [force, 0]
         x, y = self._rect.x, self._rect.y
         hit_coords = [coord+offset for coord, offset in zip((x, y), Arrow.HITBOX_OFFSET)]
         self._hitbox = pygame.Rect(hit_coords, Arrow.HITBOX_SIZE)
@@ -164,15 +156,17 @@ class Arrow(pygame.sprite.Sprite):
         '''
         Update a moving arrow's position.
         '''
-        self._rect.move_ip(self._speed)
-        self._hitbox.move_ip(self._speed)
-        if self._rect.x > SCREEN_WIDTH or self._rect.y > SCREEN_HEIGHT:
-            super().kill()
-        hit = self._hitbox.collidelist(self._target.hitbox)
-        if hit != -1:
-            self._speed = [0, 0]
-            self._img = Arrow.IMG_HIT
-            self._score = SCORE_TABLE[hit]
+        if self._speed != [0, 0]:
+            self._speed[1] += GRAVITY
+            self._rect.move_ip(self._speed)
+            self._hitbox.move_ip(self._speed)
+            if self._rect.x > SCREEN_WIDTH or self._rect.y > SCREEN_HEIGHT:
+                super().kill()
+            hit = self._hitbox.collidelist(self._target.hitbox)
+            if hit != -1:
+                self._speed = [0, 0]
+                self._img = Arrow.IMG_HIT
+                self._score = SCORE_TABLE[hit]
 
     # test
     def __del__(self):
