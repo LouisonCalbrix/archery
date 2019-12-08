@@ -13,6 +13,18 @@ SCREEN_HEIGHT = 650
 SCORE_TABLE = [3, 2, 1]
 GRAVITY = 3
 
+class Player:
+    def __init__(self):
+        self._score = 0
+
+    def update_score(self, arrow):
+        self._score += arrow.score
+        print('updated score: {}'.format(self._score))
+
+    @property
+    def score(self):
+        return self._score
+
 class Bow(pygame.sprite.Sprite):
     '''
     A bow moving across the screen from top to bottom and back.
@@ -22,15 +34,16 @@ class Bow(pygame.sprite.Sprite):
     IMG = pygame.image.load('resources/bow.png')
     ROPE_TOP = (54, 20)
     ROPE_BOT = (54, 180)
-    ROPE_STATES = 5
+    ROPE_STATES = 10
+    AMMO_MAX = 5
     SPEED = [0, 8]
     FORCE_MIN = 10
     FORCE_MAX = 50
-    TIME_FORCE_S = 2
-    TIME_COOLDOWN_S = 2
+    TIME_FORCE_S = 0.7
+    TIME_COOLDOWN_S = 1
     INSTANCE = pygame.sprite.GroupSingle()
 
-    def __init__(self):
+    def __init__(self, player):
         '''
         Create a Bow.
         '''
@@ -42,6 +55,8 @@ class Bow(pygame.sprite.Sprite):
         self._cooldown = 0
         self._speed = Bow.SPEED.copy()
         self._arrow = Arrow
+        self._ammo = Bow.AMMO_MAX
+        self._player = player
         Bow.INSTANCE.add(self)
 
     def update(self):
@@ -53,7 +68,7 @@ class Bow(pygame.sprite.Sprite):
             self._speed = [-speed_component for speed_component in self._speed]
         if self._cooldown:
             self._cooldown -= 1
-            if self._cooldown == 0:
+            if self._cooldown == 0 and self._ammo:
                 self.draw(0)
         if 0 < self._bent_time < Bow.TIME_FORCE_FPS:
             self._bent_time += 1
@@ -65,7 +80,7 @@ class Bow(pygame.sprite.Sprite):
         '''
         Bend the bow, a bow needs to be bent to shoot an arrow.
         '''
-        if not self._cooldown:
+        if not self._cooldown and self._ammo:
             self._bent_time += 1
 
     def shoot(self):
@@ -74,7 +89,8 @@ class Bow(pygame.sprite.Sprite):
         is shot.
         '''
         if self._bent_time:
-            self._arrow(self._rect, self.force)
+            self._arrow(self._player, self._rect.copy(), self.force)
+            self._ammo -= 1
             self._bent_time = 0
             self._cooldown = Bow.TIME_COOLDOWN_FPS
             self.draw(-1)
@@ -118,8 +134,8 @@ class Bow(pygame.sprite.Sprite):
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
         cls.IMG = cls.IMG.convert()
         cls.FPS = fps
-        cls.TIME_COOLDOWN_FPS = cls.TIME_COOLDOWN_S * cls.FPS
-        cls.TIME_FORCE_FPS = cls.TIME_FORCE_S * cls.FPS
+        cls.TIME_COOLDOWN_FPS = int(cls.TIME_COOLDOWN_S * cls.FPS)
+        cls.TIME_FORCE_FPS = int(cls.TIME_FORCE_S * cls.FPS)
         cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
@@ -136,20 +152,23 @@ class Arrow(pygame.sprite.Sprite):
     HITBOX_OFFSET = (165, 90)
     HITBOX_SIZE = (26, 17)
 
-    def __init__(self, bow_rect, force):
+    def __init__(self, player, bow_rect, force):
         '''
         Create an arrow that is shot by a bow whose position is represented by
         bow_rect.
         '''
         print('shot arrow {}'.format(force))
         super().__init__()
+        self._bow = bow
         self._img = Arrow.IMG
-        self._rect = bow_rect.copy()
+        self._rect = bow_rect
         self._speed = [force, 0]
         x, y = self._rect.x, self._rect.y
         hit_coords = [coord+offset for coord, offset in zip((x, y), Arrow.HITBOX_OFFSET)]
         self._hitbox = pygame.Rect(hit_coords, Arrow.HITBOX_SIZE)
-        self._target = Target.INSTANCE.sprite
+        self._target = Target.INSTANCE
+        self._player = player
+        self._score = 0
         Arrow.INSTANCES.add(self)
 
     def update(self):
@@ -167,6 +186,7 @@ class Arrow(pygame.sprite.Sprite):
                 self._speed = [0, 0]
                 self._img = Arrow.IMG_HIT
                 self._score = SCORE_TABLE[hit]
+                self._player.update_score(self)
 
     # test
     def __del__(self):
@@ -180,8 +200,12 @@ class Arrow(pygame.sprite.Sprite):
     def rect(self):
         return self._rect
 
+    @property
+    def score(self):
+        return self._score
+
     @classmethod
-    def init(cls):
+    def init(cls, background):
         '''
         Initialize the picture for future Arrow objects. Since method calls 
         in here require pygame's image module to be initialized, this class
@@ -191,9 +215,10 @@ class Arrow(pygame.sprite.Sprite):
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
         cls.IMG_HIT = cls.IMG_HIT.convert()
         cls.IMG_HIT.set_colorkey(cls.IMG_HIT.get_at((0, 0)))
+        cls.BACKGROUND = background
 
 
-class Target(pygame.sprite.Sprite):
+class Target:
     '''
     Target that needs to be hit.
     '''
@@ -206,17 +231,17 @@ class Target(pygame.sprite.Sprite):
         ((88, 0), (42, 399))
     ]
     IMG = pygame.image.load('resources/target.png')
-    INSTANCE = pygame.sprite.GroupSingle()
+    INSTANCE = None
 
-    def __init__(self):
+    def __init__(self, background):
         '''
         '''
         super().__init__()
-        self._img = Target.IMG
-        self._rect = self._img.get_rect()
-        self._rect.x = SCREEN_WIDTH - self._img.get_width()
-        self._rect.y = SCREEN_HEIGHT - self._img.get_height()
-        x, y = self._rect.x, self._rect.y
+        Target.INSTANCE = self
+        img = Target.IMG
+        x = SCREEN_WIDTH - img.get_width()
+        y = SCREEN_HEIGHT - img.get_height()
+        iddle_sprite(Target.IMG, (x, y), background)
 
         inner = Target.AREAS[Target.INNER_I]
         self._inner_hit = pygame.Rect(inner[0], inner[1])
@@ -227,7 +252,6 @@ class Target(pygame.sprite.Sprite):
         outer = Target.AREAS[Target.OUTER_I]
         self._outer_hit = pygame.Rect(outer[0], outer[1])
         self._outer_hit.move_ip(x, y)
-        Target.INSTANCE.add(self)
 
     @property
     def image(self):
@@ -278,6 +302,9 @@ class DisplayGroup(pygame.sprite.OrderedUpdates):
         super().draw(self._screen)
 
 
+def iddle_sprite(img, pos, background):
+    background.blit(img, pos)
+
 # for test purpose
 if __name__ == '__main__':
     
@@ -290,15 +317,17 @@ if __name__ == '__main__':
 
     # Bow and Arrow init
     Bow.init(fps)
-    Arrow.init()
+    Arrow.init(background)
     Target.init()
     # Bow instanciation
-    bow = Bow()
-    target = Target()
+    player = Player()
+    bow = Bow(player)
+    target = Target(background)
     onscreen_sprites = DisplayGroup(screen,
                                     background,
-                                    Bow.INSTANCE, Target.INSTANCE, Arrow.INSTANCES)
+                                    Bow.INSTANCE, Arrow.INSTANCES)
 
+    font = pygame.font.Font(None, 55)
     screen.blit(background, (0, 0))
     while True:
         for event in pygame.event.get():
@@ -312,5 +341,11 @@ if __name__ == '__main__':
                 if event.key == pygame.K_SPACE:
                     bow.shoot()
         onscreen_sprites.update_draw()
+        score_surface = font.render(str(player.score), False, (0, 255, 0))
+        screen.blit(background, (SCREEN_WIDTH//2, 0),
+                    pygame.Rect((SCREEN_WIDTH//2, 0), font.size(str(player.score))))
+        screen.blit(score_surface, (SCREEN_WIDTH//2, 0))
         pygame.display.flip()
         clock.tick(fps)
+
+
