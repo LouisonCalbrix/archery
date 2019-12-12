@@ -25,6 +25,68 @@ class Player:
     def score(self):
         return self._score
 
+
+class GameObject(pygame.sprite.Sprite):
+    '''
+    Super class for any game element that eventually gets drawn onscreen and
+    that may be moved around.
+    '''
+    def __init__(self, img, topleft, speed):
+        '''
+        Initialize game object with:
+            img being its picture onscreen and 
+            rect its position
+            speed a list of two integers that makes the game object move
+             every frame.
+        '''
+        super().__init__()
+        self._img = img
+        self._rect = img.get_rect()
+        self._rect.move_ip(topleft)
+        self._speed = speed
+
+    def update(self):
+        '''
+        Empty method. Subclass needs to override this.
+        '''
+        raise NotImplementedError()
+
+    @property
+    def image(self):
+        return self._img
+
+    @property
+    def rect(self):
+        return self._rect
+
+    @classmethod
+    def init(cls):
+        '''
+        Initialize pictures that were loaded by the subclass to represent said
+        class instances onscreen. Subclasses need to load these pictures in a
+        class attribute named IMGS that is a list of Surfaces likewise:
+            IMGS = [
+                pygame.image.load('resources/img1.png'),
+                pygame.image.load('resources/img2.png'),
+                ...
+            ]
+        Implementation advice: use named indices such as:
+            IDDLE = 0
+            RUNNING = 1
+            ...
+        So that later uses of IMGS are explicit:
+            cls.IMGS[cls.IDDLE]
+        Not to be called before pygame image modulea has been initialized.
+        '''
+        IMGS = []
+        for surface in cls.IMGS:
+            colorkey = surface.get_at((0, 0))
+            surface.set_colorkey(colorkey)
+            surface = surface.convert()
+            IMGS.append(surface)
+        cls.IMGS = IMGS
+
+
 class Bow(pygame.sprite.Sprite):
     '''
     A bow moving across the screen from top to bottom and back.
@@ -89,7 +151,8 @@ class Bow(pygame.sprite.Sprite):
         is shot.
         '''
         if self._bent_time:
-            self._arrow(self._player, self._rect.copy(), self.force)
+            topleft = self._rect.topleft
+            self._arrow(self._player, topleft, self.force)
             self._ammo -= 1
             self._bent_time = 0
             self._cooldown = Bow.TIME_COOLDOWN_FPS
@@ -99,16 +162,17 @@ class Bow(pygame.sprite.Sprite):
         '''
         Draw the bow, only to be called when the bow's state changes.
         '''
+        rope_color = (255, 255, 255)
         self._img = Bow.IMG.copy()
         overlay = pygame.Surface(Bow.IMG.get_size())
         if step == -1:
-            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_TOP, Bow.ROPE_BOT)
+            pygame.draw.line(overlay, rope_color, Bow.ROPE_TOP, Bow.ROPE_BOT)
         else:
             base_x = Bow.ROPE_TOP[0]
             x = base_x * (1 - step / Bow.ROPE_STATES)
-            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_TOP, (x, Bow.ROPE_MIDDLE))
-            pygame.draw.line(overlay, (255, 255, 255), Bow.ROPE_BOT, (x, Bow.ROPE_MIDDLE))
-            overlay.blit(Arrow.IMG, (x - base_x, 0))
+            pygame.draw.line(overlay, rope_color, Bow.ROPE_TOP, (x, Bow.ROPE_MIDDLE))
+            pygame.draw.line(overlay, rope_color, Bow.ROPE_BOT, (x, Bow.ROPE_MIDDLE))
+            overlay.blit(Arrow.IMGS[Arrow.SHOT], (x - base_x, 0))
         overlay.set_colorkey(overlay.get_at((0, 0)))
         self._img.blit(overlay, (0, 0))
 
@@ -139,33 +203,34 @@ class Bow(pygame.sprite.Sprite):
         cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
-class Arrow(pygame.sprite.Sprite):
+class Arrow(GameObject):
     '''
     An arrow that can be shot by a bow. It has an horizontal speed, that makes
     it move across the screen from left to right. It is destroyed if it goes
     beyond the screen's boundaries.
     '''
-    IMG = pygame.image.load('resources/arrow.png')
-    IMG_HIT = pygame.image.load('resources/arrow_stopped.png')
-    SPEED = [15, 0]
+    IMGS = [
+        pygame.image.load('resources/arrow.png'),
+        pygame.image.load('resources/arrow_stopped.png')
+    ]
+    SHOT = 0
+    STOPPED = 1
     INSTANCES = pygame.sprite.Group()
     HITBOX_OFFSET = (165, 90)
     HITBOX_SIZE = (26, 17)
 
-    def __init__(self, player, bow_rect, force):
+    def __init__(self, player, topleft, force):
         '''
         Create an arrow that is shot by a bow whose position is represented by
         bow_rect.
         '''
-        print('shot arrow {}'.format(force))
-        super().__init__()
-        self._bow = bow
-        self._img = Arrow.IMG
-        self._rect = bow_rect
-        self._speed = [force, 0]
+        super().__init__(Arrow.IMGS[Arrow.SHOT],
+                         topleft,
+                         [force, 0])
+
         x, y = self._rect.x, self._rect.y
-        hit_coords = [coord+offset for coord, offset in zip((x, y), Arrow.HITBOX_OFFSET)]
-        self._hitbox = pygame.Rect(hit_coords, Arrow.HITBOX_SIZE)
+        self._hitbox = pygame.Rect((x, y), Arrow.HITBOX_SIZE)
+        self._hitbox.move_ip(*Arrow.HITBOX_OFFSET)
         self._target = Target.INSTANCE
         self._player = player
         self._score = 0
@@ -184,38 +249,16 @@ class Arrow(pygame.sprite.Sprite):
             hit = self._hitbox.collidelist(self._target.hitbox)
             if hit != -1:
                 self._speed = [0, 0]
-                self._img = Arrow.IMG_HIT
+                self._img = Arrow.IMGS[Arrow.STOPPED]
                 self._score = SCORE_TABLE[hit]
                 self._player.update_score(self)
 
-    # test
     def __del__(self):
         print('deleted arrow')
 
     @property
-    def image(self):
-        return self._img
-
-    @property
-    def rect(self):
-        return self._rect
-
-    @property
     def score(self):
         return self._score
-
-    @classmethod
-    def init(cls, background):
-        '''
-        Initialize the picture for future Arrow objects. Since method calls 
-        in here require pygame's image module to be initialized, this class
-        method should not be called before pygame.init().
-        '''
-        cls.IMG = cls.IMG.convert()
-        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
-        cls.IMG_HIT = cls.IMG_HIT.convert()
-        cls.IMG_HIT.set_colorkey(cls.IMG_HIT.get_at((0, 0)))
-        cls.BACKGROUND = background
 
 
 class Target:
@@ -313,11 +356,11 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
-    background = pygame.image.load('resources/background.png')
+    background = pygame.image.load('resources/background.png').convert()
 
     # Bow and Arrow init
     Bow.init(fps)
-    Arrow.init(background)
+    Arrow.init()
     Target.init()
     # Bow instanciation
     player = Player()
