@@ -31,6 +31,7 @@ class GameObject(pygame.sprite.Sprite):
     Super class for any game element that eventually gets drawn onscreen and
     that may be moved around.
     '''
+
     def __init__(self, img, topleft, speed):
         '''
         Initialize game object with:
@@ -53,10 +54,12 @@ class GameObject(pygame.sprite.Sprite):
 
     @property
     def image(self):
+        ''' image(self) -> self._img'''
         return self._img
 
     @property
     def rect(self):
+        ''' rect(self) -> self._rect'''
         return self._rect
 
     @classmethod
@@ -87,35 +90,39 @@ class GameObject(pygame.sprite.Sprite):
         cls.IMGS = IMGS
 
 
-class Bow(pygame.sprite.Sprite):
+class Bow(GameObject):
     '''
     A bow moving across the screen from top to bottom and back.
     It can shoot arrows.
     '''
 
-    IMG = pygame.image.load('resources/bow.png')
+    # picture for bow onscreen
+    IMGS = [pygame.image.load('resources/bow.png')]
+    # drawing markers
     ROPE_TOP = (54, 20)
     ROPE_BOT = (54, 180)
+    # animation
     ROPE_STATES = 10
-    AMMO_MAX = 5
+    # misc constants
     SPEED = [0, 8]
+    AMMO_MAX = 5
     FORCE_MIN = 10
     FORCE_MAX = 50
     TIME_FORCE_S = 0.7
     TIME_COOLDOWN_S = 1
+    # class attribute keeping track of instances of the class
     INSTANCE = pygame.sprite.GroupSingle()
 
     def __init__(self, player):
         '''
         Create a Bow.
         '''
-        super().__init__()
+        super().__init__(Bow.IMGS[0],
+                         (20, 0),
+                         Bow.SPEED.copy())
         self.draw(0)
-        self._rect = self._img.get_rect()
-        self._rect.move_ip(20, 0)
         self._bent_time = 0
         self._cooldown = 0
-        self._speed = Bow.SPEED.copy()
         self._arrow = Arrow
         self._ammo = Bow.AMMO_MAX
         self._player = player
@@ -163,8 +170,8 @@ class Bow(pygame.sprite.Sprite):
         Draw the bow, only to be called when the bow's state changes.
         '''
         rope_color = (255, 255, 255)
-        self._img = Bow.IMG.copy()
-        overlay = pygame.Surface(Bow.IMG.get_size())
+        self._img = Bow.IMGS[0].copy()
+        overlay = pygame.Surface(self._img.get_size())
         if step == -1:
             pygame.draw.line(overlay, rope_color, Bow.ROPE_TOP, Bow.ROPE_BOT)
         else:
@@ -181,25 +188,15 @@ class Bow(pygame.sprite.Sprite):
     def force(self):
         return ((Bow.FORCE_MAX-Bow.FORCE_MIN) / Bow.TIME_FORCE_FPS) * self._bent_time + Bow.FORCE_MIN
 
-    @property
-    def image(self):
-        return self._img
-
-    @property
-    def rect(self):
-        return self._rect
-
     @classmethod
     def init(cls, fps):
         '''
         Initialize pictures that represent an instance of Bow onscreen. Not to
         be called before pygame image module has been initialized.
         '''
-        cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
-        cls.IMG = cls.IMG.convert()
-        cls.FPS = fps
-        cls.TIME_COOLDOWN_FPS = int(cls.TIME_COOLDOWN_S * cls.FPS)
-        cls.TIME_FORCE_FPS = int(cls.TIME_FORCE_S * cls.FPS)
+        super().init()
+        cls.TIME_COOLDOWN_FPS = int(cls.TIME_COOLDOWN_S * fps)
+        cls.TIME_FORCE_FPS = int(cls.TIME_FORCE_S * fps)
         cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
