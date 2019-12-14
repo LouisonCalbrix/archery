@@ -8,9 +8,18 @@
 import os
 import pygame
 
+#----------constants
+
+# screen and display
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
+LIGHTNESS_MAX = 95
+COLOR_SKY = pygame.Color(0, 150, 255)
+COLOR_GRASS = pygame.Color(65, 200, 65)
+
+# game score
 SCORE_TABLE = [3, 2, 1]
+# game "physics"
 GRAVITY = 3
 
 class Player:
@@ -97,7 +106,7 @@ class Bow(GameObject):
     '''
 
     # picture for bow onscreen
-    IMGS = [pygame.image.load('resources/bow.png')]
+    IMGS = [pygame.image.load('resources/bow2.png')]
     # drawing markers
     ROPE_TOP = (54, 20)
     ROPE_BOT = (54, 180)
@@ -200,6 +209,21 @@ class Bow(GameObject):
         cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
+class BentBowState:
+    '''
+    State for bow instances.
+    '''
+    def __init__(self, master):
+        self._master = master
+
+    def update(self):
+        if self._master._bent_time < Bow.TIME_FORCE_FPS:
+            self._bent_time += 1
+            step = self._bent_time / (Bow.TIME_FORCE_FPS // Bow.ROPE_STATES)
+            if step.is_integer():
+                self.draw(step)
+
+
 class Arrow(GameObject):
     '''
     An arrow that can be shot by a bow. It has an horizontal speed, that makes
@@ -207,8 +231,8 @@ class Arrow(GameObject):
     beyond the screen's boundaries.
     '''
     IMGS = [
-        pygame.image.load('resources/arrow.png'),
-        pygame.image.load('resources/arrow_stopped.png')
+        pygame.image.load('resources/arrow2.png'),
+        pygame.image.load('resources/arrow_stopped2.png')
     ]
     SHOT = 0
     STOPPED = 1
@@ -343,7 +367,35 @@ class DisplayGroup(pygame.sprite.OrderedUpdates):
 
 
 def iddle_sprite(img, pos, background):
+    '''
+    draws img at pos on the background, thus changing the background.
+    '''
     background.blit(img, pos)
+
+def draw_background(size, sky_stripes=1):
+    # background creation
+    background = pygame.Surface(size)
+    b_width, b_height = size
+    # draw sky
+    stripe_color = pygame.Color(*COLOR_SKY)
+    h, s, l, a = stripe_color.hsla
+    l_step = (LIGHTNESS_MAX - l) / sky_stripes
+    height_step = (b_height / 2) // sky_stripes + 1
+    sky_stripe = pygame.Rect(0, 0, b_width, height_step)
+    for i in range(sky_stripes):
+        pygame.draw.rect(background, stripe_color, sky_stripe)
+        sky_stripe.move_ip(0, height_step)
+        l += l_step
+        stripe_color.hsla = h, s, l, a
+#    pygame.draw.rect(background, COLOR_SKY, sky_rectangle)
+    # draw grass
+    grass_position = 0, b_height // 2
+    grass_size = b_width, round(b_height/2)
+    grass_rectangle = pygame.Rect(*grass_position, *grass_size)
+    pygame.draw.rect(background, COLOR_GRASS, grass_rectangle)
+    background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    return background
+
 
 # for test purpose
 if __name__ == '__main__':
@@ -353,7 +405,8 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
-    background = pygame.image.load('resources/background.png').convert()
+    background = draw_background((80, 180), 12)
+#    background = pygame.image.load('resources/background.png').convert()
 
     # Bow and Arrow init
     Bow.init(fps)
