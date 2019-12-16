@@ -7,13 +7,15 @@
 
 import os
 import pygame
+import random
 
 #----------constants
 
 # screen and display
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
-LIGHTNESS_MAX = 95
+LIGHTNESS_SKY_MAX = 95
+LIGHTNESS_GRASS_RANGE = (17, 60)
 COLOR_SKY = pygame.Color(0, 150, 255)
 COLOR_GRASS = pygame.Color(65, 200, 65)
 
@@ -368,31 +370,43 @@ class DisplayGroup(pygame.sprite.OrderedUpdates):
 
 def iddle_sprite(img, pos, background):
     '''
-    draws img at pos on the background, thus changing the background.
+    Draw img at pos on the background, thus changing the background.
     '''
     background.blit(img, pos)
+
+def grass_color():
+    '''
+    Return a random grass color
+    '''
+    random_color = pygame.Color(*COLOR_GRASS)
+    h, s, l, a = random_color.hsla
+    l = random.randint(*LIGHTNESS_GRASS_RANGE)
+    random_color.hsla = h, s, l, a
+    return random_color
+
 
 def draw_background(size, sky_stripes=1):
     # background creation
     background = pygame.Surface(size)
     b_width, b_height = size
     # draw sky
+    sky_height = b_height / 2
+    height_step = sky_height // sky_stripes 
     stripe_color = pygame.Color(*COLOR_SKY)
     h, s, l, a = stripe_color.hsla
-    l_step = (LIGHTNESS_MAX - l) / sky_stripes
-    height_step = (b_height / 2) // sky_stripes + 1
+    l_step = (LIGHTNESS_SKY_MAX - l) / sky_stripes
     sky_stripe = pygame.Rect(0, 0, b_width, height_step)
     for i in range(sky_stripes):
         pygame.draw.rect(background, stripe_color, sky_stripe)
         sky_stripe.move_ip(0, height_step)
         l += l_step
         stripe_color.hsla = h, s, l, a
-#    pygame.draw.rect(background, COLOR_SKY, sky_rectangle)
     # draw grass
-    grass_position = 0, b_height // 2
-    grass_size = b_width, round(b_height/2)
-    grass_rectangle = pygame.Rect(*grass_position, *grass_size)
-    pygame.draw.rect(background, COLOR_GRASS, grass_rectangle)
+    sky_bottom = int((i+1) * height_step)
+    px_array = pygame.PixelArray(background)
+    for i in range(b_width):
+        for j in range(sky_bottom, b_height):
+            px_array[i, j] = grass_color()
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
     return background
 
@@ -405,7 +419,7 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
-    background = draw_background((80, 180), 12)
+    background = draw_background((280, 80), 8)
 #    background = pygame.image.load('resources/background.png').convert()
 
     # Bow and Arrow init
