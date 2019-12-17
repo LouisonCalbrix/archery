@@ -15,9 +15,8 @@ import random
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
 LIGHTNESS_SKY_MAX = 95
-LIGHTNESS_GRASS_RANGE = (17, 60)
-COLOR_SKY = pygame.Color(0, 150, 255)
-COLOR_GRASS = pygame.Color(65, 200, 65)
+COLOR_SKY = pygame.Color(0, 100, 200)
+COLOR_GRASS = pygame.Color(70, 200, 70)
 
 # game score
 SCORE_TABLE = [3, 2, 1]
@@ -374,6 +373,22 @@ def iddle_sprite(img, pos, background):
     '''
     background.blit(img, pos)
 
+def darken_color(base_color, current_color, counter):
+    '''
+    Randomly return a darken color or the base_color depending on counter,
+    the highest counter is the less likely a darker color will be returned.
+    '''
+    prob = 15 + counter
+    rand = random.randint(0, prob)
+    if rand >= prob-17:
+        # darken
+        h, s, l, a = current_color.hsla
+        l *= 0.70
+        current_color.hsla = h, s, l, a
+        return current_color, counter+1
+    else:
+        return pygame.Color(*base_color), 0
+
 def grass_color():
     '''
     Return a random grass color
@@ -404,9 +419,12 @@ def draw_background(size, sky_stripes=1):
     # draw grass
     sky_bottom = int((i+1) * height_step)
     px_array = pygame.PixelArray(background)
+    current_color = pygame.Color(*COLOR_GRASS)
+    counter = 0
     for i in range(b_width):
-        for j in range(sky_bottom, b_height):
-            px_array[i, j] = grass_color()
+        for j in range(b_height-1, sky_bottom-1, -1):
+            current_color, counter = darken_color(COLOR_GRASS, current_color, counter)
+            px_array[i, j] = current_color
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
     return background
 
@@ -419,7 +437,7 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
-    background = draw_background((280, 80), 8)
+    background = draw_background((200, 240), 8)
 #    background = pygame.image.load('resources/background.png').convert()
 
     # Bow and Arrow init
