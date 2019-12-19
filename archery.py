@@ -14,8 +14,8 @@ import random
 # screen and display
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
-LIGHTNESS_SKY_MAX = 95
-COLOR_SKY = pygame.Color(0, 100, 200)
+LIGHTNESS_SKY_MAX = 90
+COLOR_SKY = pygame.Color(80, 80, 200)
 COLOR_GRASS = pygame.Color(70, 200, 70)
 
 # game score
@@ -130,50 +130,29 @@ class Bow(GameObject):
         super().__init__(Bow.IMGS[0],
                          (20, 0),
                          Bow.SPEED.copy())
-        self.draw(0)
-        self._bent_time = 0
-        self._cooldown = 0
+        self._state = NormalBowState(self)
         self._arrow = Arrow
         self._ammo = Bow.AMMO_MAX
         self._player = player
         Bow.INSTANCE.add(self)
 
-    def update(self):
+    def update(self, inputs):
         '''
         Update bow's position and potentially handle the cooldown.
         '''
         self._rect.move_ip(*self._speed)
         if self._rect.y < 0 or self._rect.y > SCREEN_HEIGHT-self._rect.height:
             self._speed = [-speed_component for speed_component in self._speed]
-        if self._cooldown:
-            self._cooldown -= 1
-            if self._cooldown == 0 and self._ammo:
-                self.draw(0)
-        if 0 < self._bent_time < Bow.TIME_FORCE_FPS:
-            self._bent_time += 1
-            step = self._bent_time / (Bow.TIME_FORCE_FPS // Bow.ROPE_STATES)
-            if step.is_integer():
-                self.draw(step)
-
-    def bend(self):
-        '''
-        Bend the bow, a bow needs to be bent to shoot an arrow.
-        '''
-        if not self._cooldown and self._ammo:
-            self._bent_time += 1
+        self._state.update(inputs)
 
     def shoot(self):
         '''
         Shoot an arrow, when the pressure of a bent bow is release, an arrow
         is shot.
         '''
-        if self._bent_time:
-            topleft = self._rect.topleft
-            self._arrow(self._player, topleft, self.force)
-            self._ammo -= 1
-            self._bent_time = 0
-            self._cooldown = Bow.TIME_COOLDOWN_FPS
-            self.draw(-1)
+        topleft = self._rect.topleft
+        self._arrow(self._player, topleft, self.force)
+        self._ammo -= 1
 
     def draw(self, step):
         '''
@@ -210,19 +189,71 @@ class Bow(GameObject):
         cls.ROPE_MIDDLE = ((cls.ROPE_BOT[1] - cls.ROPE_TOP[1]) // 2) + cls.ROPE_TOP[1]
 
 
+class NormalBowState:
+    '''
+    State for bow instances.
+    '''
+    def __init__(self, master):
+        self._master = master
+        self._master.draw(0)
+
+    def update(self, inputs):
+        for an_input in inputs:
+            if an_input.type == pygame.KEYDOWN:
+                if an_input.key == pygame.K_SPACE:
+                    self._master._state = BentBowState(self._master)
+
+
 class BentBowState:
     '''
     State for bow instances.
     '''
     def __init__(self, master):
         self._master = master
+        self._master._bent_time = 0
 
-    def update(self):
+    def update(self, inputs):
         if self._master._bent_time < Bow.TIME_FORCE_FPS:
-            self._bent_time += 1
-            step = self._bent_time / (Bow.TIME_FORCE_FPS // Bow.ROPE_STATES)
+            self._master._bent_time += 1
+            step = self._master._bent_time / (Bow.TIME_FORCE_FPS // Bow.ROPE_STATES)
             if step.is_integer():
-                self.draw(step)
+                self._master.draw(step)
+        for an_input in inputs:
+            if an_input.type == pygame.KEYUP:
+                if an_input.key == pygame.K_SPACE:
+                    self._master.shoot()
+                    if self._master._ammo:
+                        self._master._state = ReloadBowState(self._master)
+                    else:
+                        self._master._state = EmptyBowState(self._master)
+
+
+class ReloadBowState:
+    '''
+    State for bow instances.
+    '''
+    def __init__(self, master):
+        self._master = master
+        self._master.draw(-1)
+        self._master._cooldown = Bow.TIME_COOLDOWN_FPS
+
+    def update(self, inputs):
+        self._master._cooldown -= 1
+        if self._master._cooldown == 0:
+            self._master._state = NormalBowState(self._master)
+
+
+class EmptyBowState:
+    '''
+    State for bow instances.
+    '''
+    def __init__(self, master):
+        self._master = master
+        self._master.draw(-1)
+        self._master._speed = [0, 0]
+
+    def update(self, inputs):
+        pass
 
 
 class Arrow(GameObject):
@@ -389,17 +420,6 @@ def darken_color(base_color, current_color, counter):
     else:
         return pygame.Color(*base_color), 0
 
-def grass_color():
-    '''
-    Return a random grass color
-    '''
-    random_color = pygame.Color(*COLOR_GRASS)
-    h, s, l, a = random_color.hsla
-    l = random.randint(*LIGHTNESS_GRASS_RANGE)
-    random_color.hsla = h, s, l, a
-    return random_color
-
-
 def draw_background(size, sky_stripes=1):
     # background creation
     background = pygame.Surface(size)
@@ -422,7 +442,8 @@ def draw_background(size, sky_stripes=1):
     current_color = pygame.Color(*COLOR_GRASS)
     counter = 0
     for i in range(b_width):
-        for j in range(b_height-1, sky_bottom-1, -1):
+        for j in range(sky_bottom, b_height):
+#        for j in range(b_height-1, sky_bottom-1, -1):
             current_color, counter = darken_color(COLOR_GRASS, current_color, counter)
             px_array[i, j] = current_color
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -455,17 +476,22 @@ if __name__ == '__main__':
     font = pygame.font.Font(None, 55)
     screen.blit(background, (0, 0))
     while True:
+        for group in Bow.INSTANCE, Arrow.INSTANCES:
+            group.clear(screen, background)
+        inputs = []
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    bow.bend()
+                inputs.append(event)
             elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_SPACE:
-                    bow.shoot()
-        onscreen_sprites.update_draw()
+                inputs.append(event)
+        Bow.INSTANCE.sprite.update(inputs)
+        Arrow.INSTANCES.update()
+        for group in Bow.INSTANCE, Arrow.INSTANCES:
+            group.draw(screen)
+#        onscreen_sprites.update_draw(inputs)
         score_surface = font.render(str(player.score), False, (0, 255, 0))
         screen.blit(background, (SCREEN_WIDTH//2, 0),
                     pygame.Rect((SCREEN_WIDTH//2, 0), font.size(str(player.score))))
