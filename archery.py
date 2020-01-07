@@ -15,8 +15,9 @@ import random
 SCREEN_WIDTH = 850
 SCREEN_HEIGHT = 650
 LIGHTNESS_SKY_MAX = 90
-COLOR_SKY = pygame.Color(80, 80, 200)
-COLOR_GRASS = pygame.Color(70, 200, 70)
+COLOR_SKY = (80, 80, 200)
+COLOR_GRASS = (70, 200, 70)
+COLOR_ROPE = (180, 180, 180)
 
 # game score
 SCORE_TABLE = [3, 2, 1]
@@ -24,15 +25,24 @@ SCORE_TABLE = [3, 2, 1]
 GRAVITY = 3
 
 class Player:
+    '''
+    '''
+    
     def __init__(self):
+        '''
+        Initialize the player's score.
+        '''
         self._score = 0
 
-    def update_score(self, arrow):
-        self._score += arrow.score
-        print('updated score: {}'.format(self._score))
+    def update_score(self, zone):
+        '''
+        Update the player's score with depending on the zone arrow has hit.
+        '''
+        self._score += SCORE_TABLE[zone]
 
     @property
     def score(self):
+        ''' score(self) -> self._score'''
         return self._score
 
 
@@ -83,6 +93,9 @@ class GameObject(pygame.sprite.Sprite):
                 pygame.image.load('resources/img2.png'),
                 ...
             ]
+        If the subclass requires only one picture then it needs to be done this
+        way:
+            IMG = pygame.load('resources/img.png')
         Implementation advice: use named indices such as:
             IDDLE = 0
             RUNNING = 1
@@ -91,13 +104,20 @@ class GameObject(pygame.sprite.Sprite):
             cls.IMGS[cls.IDDLE]
         Not to be called before pygame image modulea has been initialized.
         '''
-        IMGS = []
-        for surface in cls.IMGS:
+        try:
+            IMGS = []
+            for surface in cls.IMGS:
+                colorkey = surface.get_at((0, 0))
+                surface.set_colorkey(colorkey)
+                surface = surface.convert()
+                IMGS.append(surface)
+            cls.IMGS = IMGS
+        except AttributeError:
+            surface = cls.IMG
             colorkey = surface.get_at((0, 0))
             surface.set_colorkey(colorkey)
             surface = surface.convert()
-            IMGS.append(surface)
-        cls.IMGS = IMGS
+            cls.IMG = surface
 
 
 class Bow(GameObject):
@@ -107,48 +127,51 @@ class Bow(GameObject):
     '''
 
     # picture for bow onscreen
-    IMGS = [pygame.image.load('resources/bow2.png')]
+    IMG = pygame.image.load('resources/bow2.png')
     # drawing markers
     ROPE_TOP = (54, 20)
     ROPE_BOT = (54, 180)
     # animation
     ROPE_STATES = 10
     # misc constants
+    POS_INIT = (20, 0)
     SPEED = [0, 8]
     AMMO_MAX = 5
     FORCE_MIN = 10
     FORCE_MAX = 50
     TIME_FORCE_S = 0.7
     TIME_COOLDOWN_S = 1
-    # class attribute keeping track of instances of the class
+    # class attribute keeping track of the only instance of the class
     INSTANCE = pygame.sprite.GroupSingle()
 
     def __init__(self, player):
         '''
-        Create a Bow.
+        Create a Bow. A player is needed to eventually be able to keep track
+        of the score.
         '''
-        super().__init__(Bow.IMGS[0],
-                         (20, 0),
+        super().__init__(Bow.IMG,
+                         Bow.POS_INIT,
                          Bow.SPEED.copy())
-        self._state = NormalBowState(self)
         self._arrow = Arrow
         self._ammo = Bow.AMMO_MAX
+        self._state = NormalBowState(self)
         self._player = player
         Bow.INSTANCE.add(self)
 
     def update(self, inputs):
         '''
-        Update bow's position and potentially handle the cooldown.
+        Update bow's position and uses its state's update method to do other
+        state specific updates.
         '''
         self._rect.move_ip(*self._speed)
+        # invert speed if going out of screen
         if self._rect.y < 0 or self._rect.y > SCREEN_HEIGHT-self._rect.height:
             self._speed = [-speed_component for speed_component in self._speed]
         self._state.update(inputs)
 
     def shoot(self):
         '''
-        Shoot an arrow, when the pressure of a bent bow is release, an arrow
-        is shot.
+        Shoot an arrow with all the force accumulated.
         '''
         topleft = self._rect.topleft
         self._arrow(self._player, topleft, self.force)
@@ -156,32 +179,34 @@ class Bow(GameObject):
 
     def draw(self, step):
         '''
-        Draw the bow, only to be called when the bow's state changes.
+        Redraw a bow's _img, only to be called when the bow's state changes.
         '''
-        rope_color = (255, 255, 255)
-        self._img = Bow.IMGS[0].copy()
+        self._img = Bow.IMG.copy()
         overlay = pygame.Surface(self._img.get_size())
         if step == -1:
-            pygame.draw.line(overlay, rope_color, Bow.ROPE_TOP, Bow.ROPE_BOT)
+            pygame.draw.line(overlay, COLOR_ROPE, Bow.ROPE_TOP, Bow.ROPE_BOT)
         else:
             base_x = Bow.ROPE_TOP[0]
             x = base_x * (1 - step / Bow.ROPE_STATES)
-            pygame.draw.line(overlay, rope_color, Bow.ROPE_TOP, (x, Bow.ROPE_MIDDLE))
-            pygame.draw.line(overlay, rope_color, Bow.ROPE_BOT, (x, Bow.ROPE_MIDDLE))
+            pygame.draw.line(overlay, COLOR_ROPE, Bow.ROPE_TOP, (x, Bow.ROPE_MIDDLE))
+            pygame.draw.line(overlay, COLOR_ROPE, Bow.ROPE_BOT, (x, Bow.ROPE_MIDDLE))
             overlay.blit(Arrow.IMGS[Arrow.SHOT], (x - base_x, 0))
         overlay.set_colorkey(overlay.get_at((0, 0)))
         self._img.blit(overlay, (0, 0))
 
-
     @property
     def force(self):
+        ''' 
+        Return a mapping of _bent_time between Bow.FORCE_MAX and Bow.FORCE_MIN 
+        '''
         return ((Bow.FORCE_MAX-Bow.FORCE_MIN) / Bow.TIME_FORCE_FPS) * self._bent_time + Bow.FORCE_MIN
 
     @classmethod
     def init(cls, fps):
         '''
-        Initialize pictures that represent an instance of Bow onscreen. Not to
-        be called before pygame image module has been initialized.
+        Initialize the picture that represents an instance of Bow onscreen. 
+        Also initialize class constants related to time depending on fps rate.
+        Not to be called before pygame image module has been initialized.
         '''
         super().init()
         cls.TIME_COOLDOWN_FPS = int(cls.TIME_COOLDOWN_S * fps)
@@ -191,7 +216,7 @@ class Bow(GameObject):
 
 class NormalBowState:
     '''
-    State for bow instances.
+    State for bow instances. Initial Bow state, wait for inputs.
     '''
     def __init__(self, master):
         self._master = master
@@ -206,7 +231,8 @@ class NormalBowState:
 
 class BentBowState:
     '''
-    State for bow instances.
+    State for bow instances. Master bow amasses force as long as it is in this
+    state, that force is released to shoot an arrow when this state is exited.
     '''
     def __init__(self, master):
         self._master = master
@@ -230,7 +256,8 @@ class BentBowState:
 
 class ReloadBowState:
     '''
-    State for bow instances.
+    State for bow instances. Master bow cannot change its state before a
+    certain amount of time.
     '''
     def __init__(self, master):
         self._master = master
@@ -245,7 +272,8 @@ class ReloadBowState:
 
 class EmptyBowState:
     '''
-    State for bow instances.
+    State for bow instances. Master bow doesn't have any more ammunition, it is
+    stopped to make it obvious the game is over.
     '''
     def __init__(self, master):
         self._master = master
@@ -274,19 +302,17 @@ class Arrow(GameObject):
 
     def __init__(self, player, topleft, force):
         '''
-        Create an arrow that is shot by a bow whose position is represented by
-        bow_rect.
+        Create an arrow shot with force from topleft.
         '''
         super().__init__(Arrow.IMGS[Arrow.SHOT],
                          topleft,
                          [force, 0])
-
+        # hitbox creation
         x, y = self._rect.x, self._rect.y
         self._hitbox = pygame.Rect((x, y), Arrow.HITBOX_SIZE)
         self._hitbox.move_ip(*Arrow.HITBOX_OFFSET)
         self._target = Target.INSTANCE
         self._player = player
-        self._score = 0
         Arrow.INSTANCES.add(self)
 
     def update(self):
@@ -299,18 +325,18 @@ class Arrow(GameObject):
             self._hitbox.move_ip(self._speed)
             if self._rect.x > SCREEN_WIDTH or self._rect.y > SCREEN_HEIGHT:
                 super().kill()
-            hit = self._hitbox.collidelist(self._target.hitbox)
-            if hit != -1:
+            zone = self._hitbox.collidelist(self._target.hitbox)
+            if zone != -1:
                 self._speed = [0, 0]
                 self._img = Arrow.IMGS[Arrow.STOPPED]
-                self._score = SCORE_TABLE[hit]
-                self._player.update_score(self)
+                self._player.update_score(zone)
 
     def __del__(self):
         print('deleted arrow')
 
     @property
     def score(self):
+        ''' score(self) -> self._score '''
         return self._score
 
 
@@ -332,13 +358,11 @@ class Target:
     def __init__(self, background):
         '''
         '''
-        super().__init__()
         Target.INSTANCE = self
         img = Target.IMG
         x = SCREEN_WIDTH - img.get_width()
         y = SCREEN_HEIGHT - img.get_height()
         iddle_sprite(Target.IMG, (x, y), background)
-
         inner = Target.AREAS[Target.INNER_I]
         self._inner_hit = pygame.Rect(inner[0], inner[1])
         self._inner_hit.move_ip(x, y)
@@ -351,51 +375,54 @@ class Target:
 
     @property
     def image(self):
+        ''' image(self) -> self._img '''
         return self._img
 
     @property
     def rect(self):
+        ''' rect(self) -> self._rect '''
         return self._rect
 
     @property
     def hitbox(self):
+        ''' hitbox(self) -> tuple of Rect '''
         return self._inner_hit, self._middle_hit, self._outer_hit
 
     @classmethod
     def init(cls):
         '''
-        Initialize pictures that represent an instance of Target onscreen. Not to
+        Initialize picture that represent an instance of Target onscreen. Not to
         be called before pygame image module has been initialized.
         '''
         cls.IMG = cls.IMG.convert()
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
-class DisplayGroup(pygame.sprite.OrderedUpdates):
-    '''
-    Class whose purpose is to draw every game object on the screen.
-    '''
-
-    def __init__(self, screen, background, *groups):
-        '''
-        Initialize a display group. groups are expected to be pygame.sprite.Group,
-        or subclass.
-        '''
-        super().__init__()
-        self._screen = screen
-        self._background = background
-        self._groups = groups
-        for group in self._groups:
-            super().add(group.sprites())
-
-    def update_draw(self):
-        for group in self._groups:
-            for sprite in group.sprites():
-                if sprite not in self:
-                    super().add(sprite) 
-        super().clear(self._screen, self._background)
-        super().update()
-        super().draw(self._screen)
+#class DisplayGroup(pygame.sprite.OrderedUpdates):
+#    '''
+#    Class whose purpose is to draw every game object on the screen.
+#    '''
+#
+#    def __init__(self, screen, background, *groups):
+#        '''
+#        Initialize a display group. groups are expected to be pygame.sprite.Group,
+#        or subclass.
+#        '''
+#        super().__init__()
+#        self._screen = screen
+#        self._background = background
+#        self._groups = groups
+#        for group in self._groups:
+#            super().add(group.sprites())
+#
+#    def update_draw(self):
+#        for group in self._groups:
+#            for sprite in group.sprites():
+#                if sprite not in self:
+#                    super().add(sprite) 
+#        super().clear(self._screen, self._background)
+#        super().update()
+#        super().draw(self._screen)
 
 
 def iddle_sprite(img, pos, background):
@@ -443,7 +470,6 @@ def draw_background(size, sky_stripes=1):
     counter = 0
     for i in range(b_width):
         for j in range(sky_bottom, b_height):
-#        for j in range(b_height-1, sky_bottom-1, -1):
             current_color, counter = darken_color(COLOR_GRASS, current_color, counter)
             px_array[i, j] = current_color
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -458,8 +484,8 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
+    score_font = pygame.font.Font(None, 55)
     background = draw_background((200, 240), 8)
-#    background = pygame.image.load('resources/background.png').convert()
 
     # Bow and Arrow init
     Bow.init(fps)
@@ -469,15 +495,19 @@ if __name__ == '__main__':
     player = Player()
     bow = Bow(player)
     target = Target(background)
-    onscreen_sprites = DisplayGroup(screen,
-                                    background,
-                                    Bow.INSTANCE, Arrow.INSTANCES)
+#    onscreen_sprites = DisplayGroup(screen,
+#                                    background,
+#                                    Bow.INSTANCE, Arrow.INSTANCES)
 
-    font = pygame.font.Font(None, 55)
+    # first screen drawn
     screen.blit(background, (0, 0))
     while True:
+
+        # clean previous position
         for group in Bow.INSTANCE, Arrow.INSTANCES:
             group.clear(screen, background)
+
+        # dump all previous inputs and grab relevant ones
         inputs = []
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -492,9 +522,9 @@ if __name__ == '__main__':
         for group in Bow.INSTANCE, Arrow.INSTANCES:
             group.draw(screen)
 #        onscreen_sprites.update_draw(inputs)
-        score_surface = font.render(str(player.score), False, (0, 255, 0))
+        score_surface = score_font.render(str(player.score), False, (0, 255, 0))
         screen.blit(background, (SCREEN_WIDTH//2, 0),
-                    pygame.Rect((SCREEN_WIDTH//2, 0), font.size(str(player.score))))
+                    pygame.Rect((SCREEN_WIDTH//2, 0), score_font.size(str(player.score))))
         screen.blit(score_surface, (SCREEN_WIDTH//2, 0))
         pygame.display.flip()
         clock.tick(fps)
