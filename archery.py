@@ -342,7 +342,15 @@ class Arrow(GameObject):
 
 class Target:
     '''
-    Target that needs to be hit.
+    Target that needs to be hit. The class is supposed to be instanciated only
+    once for every game so, instead of keeping a reference of that instance, I
+    recommend refering to it using the class attribute INSTANCE.
+    recommended instanciation:
+        Target(background_surface)
+    use not intended:
+        target = Target(background_surface)
+    recommended reference:
+        Target.INSTANCE
     '''
     OUTER_I = 2
     MIDDLE_I = 1
@@ -357,6 +365,9 @@ class Target:
 
     def __init__(self, background):
         '''
+        Create a target. Since the target's sprite is drawn right away and 
+        never moved around a surface on which it is going to be drawn is needed:
+        that surface is the parameter background.
         '''
         Target.INSTANCE = self
         img = Target.IMG
@@ -494,7 +505,7 @@ if __name__ == '__main__':
     # Bow instanciation
     player = Player()
     bow = Bow(player)
-    target = Target(background)
+    Target(background)
 #    onscreen_sprites = DisplayGroup(screen,
 #                                    background,
 #                                    Bow.INSTANCE, Arrow.INSTANCES)
