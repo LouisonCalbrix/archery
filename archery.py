@@ -24,27 +24,6 @@ SCORE_TABLE = [3, 2, 1]
 # game "physics"
 GRAVITY = 3
 
-class Player:
-    '''
-    '''
-    
-    def __init__(self):
-        '''
-        Initialize the player's score.
-        '''
-        self._score = 0
-
-    def update_score(self, zone):
-        '''
-        Update the player's score with depending on the zone arrow has hit.
-        '''
-        self._score += SCORE_TABLE[zone]
-
-    @property
-    def score(self):
-        ''' score(self) -> self._score'''
-        return self._score
-
 
 class GameObject(pygame.sprite.Sprite):
     '''
@@ -144,9 +123,9 @@ class Bow(GameObject):
     # class attribute keeping track of the only instance of the class
     INSTANCE = pygame.sprite.GroupSingle()
 
-    def __init__(self, player):
+    def __init__(self, context):
         '''
-        Create a Bow. A player is needed to eventually be able to keep track
+        Create a Bow. A context is needed to eventually be able to keep track
         of the score.
         '''
         super().__init__(Bow.IMG,
@@ -155,7 +134,7 @@ class Bow(GameObject):
         self._arrow = Arrow
         self._ammo = Bow.AMMO_MAX
         self._state = NormalBowState(self)
-        self._player = player
+        self._context = context
         Bow.INSTANCE.add(self)
 
     def update(self, inputs):
@@ -174,7 +153,7 @@ class Bow(GameObject):
         Shoot an arrow with all the force accumulated.
         '''
         topleft = self._rect.topleft
-        self._arrow(self._player, topleft, self.force)
+        self._arrow(self._context, topleft, self.force)
         self._ammo -= 1
 
     def draw(self, step):
@@ -290,6 +269,7 @@ class Arrow(GameObject):
     it move across the screen from left to right. It is destroyed if it goes
     beyond the screen's boundaries.
     '''
+
     IMGS = [
         pygame.image.load('resources/arrow2.png'),
         pygame.image.load('resources/arrow_stopped2.png')
@@ -300,7 +280,7 @@ class Arrow(GameObject):
     HITBOX_OFFSET = (165, 90)
     HITBOX_SIZE = (26, 17)
 
-    def __init__(self, player, topleft, force):
+    def __init__(self, context, topleft, force):
         '''
         Create an arrow shot with force from topleft.
         '''
@@ -312,7 +292,7 @@ class Arrow(GameObject):
         self._hitbox = pygame.Rect((x, y), Arrow.HITBOX_SIZE)
         self._hitbox.move_ip(*Arrow.HITBOX_OFFSET)
         self._target = Target.INSTANCE
-        self._player = player
+        self._context = context
         Arrow.INSTANCES.add(self)
 
     def update(self):
@@ -329,7 +309,8 @@ class Arrow(GameObject):
             if zone != -1:
                 self._speed = [0, 0]
                 self._img = Arrow.IMGS[Arrow.STOPPED]
-                self._player.update_score(zone)
+                self._context.update_score(zone, self)
+                super().kill()
 
     def __del__(self):
         print('deleted arrow')
@@ -409,31 +390,55 @@ class Target:
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
-#class DisplayGroup(pygame.sprite.OrderedUpdates):
-#    '''
-#    Class whose purpose is to draw every game object on the screen.
-#    '''
-#
-#    def __init__(self, screen, background, *groups):
-#        '''
-#        Initialize a display group. groups are expected to be pygame.sprite.Group,
-#        or subclass.
-#        '''
-#        super().__init__()
-#        self._screen = screen
-#        self._background = background
-#        self._groups = groups
-#        for group in self._groups:
-#            super().add(group.sprites())
-#
-#    def update_draw(self):
-#        for group in self._groups:
-#            for sprite in group.sprites():
-#                if sprite not in self:
-#                    super().add(sprite) 
-#        super().clear(self._screen, self._background)
-#        super().update()
-#        super().draw(self._screen)
+class GameContext:
+    '''
+    The game context contains all the actual game logic. Its attribute are:
+        - _screen: the application's display surface on which the game is drawn
+        - _background: the background picture bound to change minimally during
+                       the whole game.
+        - _score: the score
+        - _score_font: the font used to write out the score onscreen
+    '''
+    def __init__(self, screen):
+        '''
+        Create GameContext object. During initialization, Bow and Target class
+        are both instanciated.
+        '''
+        self._screen =  screen
+        self._background = draw_background((200, 240), 8)
+        self._score = 0
+        self._score_font = pygame.font.Font(None, 55)
+        # Bow instanciation
+        Bow(self)
+        Target(self._background)
+        # first screen drawn
+        self._screen.blit(self._background, (0, 0))
+
+    def update(self, inputs):
+        # clean up previous position
+        for group in Bow.INSTANCE, Arrow.INSTANCES:
+            group.clear(self._screen, self._background)
+        score_surf_pos = SCREEN_WIDTH//2, 0
+        self._screen.blit(self._background, score_surf_pos,
+                          pygame.Rect(score_surf_pos, self._score_font.size(str(self._score))))
+        # update bow and arrows
+        Bow.INSTANCE.sprite.update(inputs)
+        Arrow.INSTANCES.update()
+        # draw bow and arrows
+        for group in Bow.INSTANCE, Arrow.INSTANCES:
+            group.draw(self._screen)
+        # update score surface
+        score_surface = self._score_font.render(str(self._score), False, (0, 255, 0))
+        screen.blit(score_surface, score_surf_pos)
+
+    def update_score(self, zone, arrow):
+        '''
+        Update the context's score depending on the zone hit, draw the arrow
+        on the background and refresh the screen.
+        '''
+        self._score += SCORE_TABLE[zone]
+        iddle_sprite(arrow.image, arrow.rect, self._background)
+        self._screen.blit(self._background, (0, 0))
 
 
 def iddle_sprite(img, pos, background):
@@ -495,28 +500,15 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     fps = 30
-    score_font = pygame.font.Font(None, 55)
-    background = draw_background((200, 240), 8)
 
     # Bow and Arrow init
     Bow.init(fps)
     Arrow.init()
     Target.init()
-    # Bow instanciation
-    player = Player()
-    bow = Bow(player)
-    Target(background)
-#    onscreen_sprites = DisplayGroup(screen,
-#                                    background,
-#                                    Bow.INSTANCE, Arrow.INSTANCES)
+    # Game Context
+    game_context = GameContext(screen)
 
-    # first screen drawn
-    screen.blit(background, (0, 0))
     while True:
-
-        # clean previous position
-        for group in Bow.INSTANCE, Arrow.INSTANCES:
-            group.clear(screen, background)
 
         # dump all previous inputs and grab relevant ones
         inputs = []
@@ -528,15 +520,7 @@ if __name__ == '__main__':
                 inputs.append(event)
             elif event.type == pygame.KEYUP:
                 inputs.append(event)
-        Bow.INSTANCE.sprite.update(inputs)
-        Arrow.INSTANCES.update()
-        for group in Bow.INSTANCE, Arrow.INSTANCES:
-            group.draw(screen)
-#        onscreen_sprites.update_draw(inputs)
-        score_surface = score_font.render(str(player.score), False, (0, 255, 0))
-        screen.blit(background, (SCREEN_WIDTH//2, 0),
-                    pygame.Rect((SCREEN_WIDTH//2, 0), score_font.size(str(player.score))))
-        screen.blit(score_surface, (SCREEN_WIDTH//2, 0))
+        game_context.update(inputs)
         pygame.display.flip()
         clock.tick(fps)
 
