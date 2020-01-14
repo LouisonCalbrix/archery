@@ -17,6 +17,7 @@ SCREEN_HEIGHT = 650
 LIGHTNESS_SKY_MAX = 90
 COLOR_SKY = (80, 80, 200)
 COLOR_GRASS = (70, 200, 70)
+COLOR_FONT = (0, 255, 40)
 COLOR_ROPE = (180, 180, 180)
 
 # game score
@@ -411,10 +412,12 @@ class GameContext:
         # Bow instanciation
         Bow(self)
         Target(self._background)
-        # first screen drawn
-        self._screen.blit(self._background, (0, 0))
+        self._drawn = False
 
     def update(self, inputs):
+        if not self._drawn:
+            self._screen.blit(self._background, (0, 0))
+            self._drawn = True
         # clean up previous position
         for group in Bow.INSTANCE, Arrow.INSTANCES:
             group.clear(self._screen, self._background)
@@ -428,8 +431,14 @@ class GameContext:
         for group in Bow.INSTANCE, Arrow.INSTANCES:
             group.draw(self._screen)
         # update score surface
-        score_surface = self._score_font.render(str(self._score), False, (0, 255, 0))
+        score_surface = self._score_font.render(str(self._score), False, COLOR_FONT)
         screen.blit(score_surface, score_surf_pos)
+        # hand control to another contex
+        for an_input in inputs:
+            if an_input.type == pygame.KEYDOWN:
+                if an_input.key == pygame.K_ESCAPE:
+                    self._drawn = False
+                    return "Pause"
 
     def update_score(self, zone, arrow):
         '''
@@ -439,6 +448,43 @@ class GameContext:
         self._score += SCORE_TABLE[zone]
         iddle_sprite(arrow.image, arrow.rect, self._background)
         self._screen.blit(self._background, (0, 0))
+
+
+class PauseContext:
+    '''
+    The PauseContext is just a layer drawn over the game when it's paused.
+    '''
+    COLOR_BG = (255, 255, 255, 90)
+
+    def __init__(self, screen):
+        self._screen = screen
+        self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), 
+                                          flags=pygame.SRCALPHA)
+        self._big_font = pygame.font.Font(None, 80)
+        self._small_font = pygame.font.Font(None, 55)
+        # drawing layer
+        self._background.fill(PauseContext.COLOR_BG)
+        pause_text = "P . A . U . S . E"
+        instruction_text = "press ES.CA.PE to resume"
+        pause_surface = self._big_font.render(pause_text,
+                                              False,
+                                              COLOR_FONT)
+        instruction_surface = self._small_font.render(instruction_text,
+                                                      False,
+                                                      COLOR_FONT)
+        self._background.blit(pause_surface, (40, 40))
+        self._background.blit(instruction_surface, (40, 200))
+        self._drawn = False
+
+    def update(self, inputs):
+        if not self._drawn:
+            self._screen.blit(self._background, (0, 0))
+            self._drawn = True
+        for an_input in inputs:
+            if an_input.type == pygame.KEYDOWN:
+                if an_input.key == pygame.K_ESCAPE:
+                    self._drawn = False
+                    return "Game"
 
 
 def iddle_sprite(img, pos, background):
@@ -505,8 +551,14 @@ if __name__ == '__main__':
     Bow.init(fps)
     Arrow.init()
     Target.init()
-    # Game Context
+    # Contexts
     game_context = GameContext(screen)
+    pause_context = PauseContext(screen)
+    context_dict = {
+        "Game": game_context,
+        "Pause": pause_context
+    }
+    active_context = game_context
 
     while True:
 
@@ -520,7 +572,9 @@ if __name__ == '__main__':
                 inputs.append(event)
             elif event.type == pygame.KEYUP:
                 inputs.append(event)
-        game_context.update(inputs)
+        context_change = active_context.update(inputs)
+        if context_change:
+            active_context = context_dict[context_change]
         pygame.display.flip()
         clock.tick(fps)
 
