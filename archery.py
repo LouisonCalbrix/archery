@@ -19,6 +19,7 @@ COLOR_SKY = (80, 80, 200)
 COLOR_GRASS = (70, 200, 70)
 COLOR_FONT = (0, 255, 40)
 COLOR_ROPE = (180, 180, 180)
+FONT_NAME = "resources/CloisterBlack.ttf"
 
 # game score
 SCORE_TABLE = [3, 2, 1]
@@ -408,7 +409,7 @@ class GameContext:
         self._screen =  screen
         self._background = draw_background((200, 240), 8)
         self._score = 0
-        self._score_font = pygame.font.Font(None, 55)
+        self._score_font = pygame.font.Font(FONT_NAME, 55)
         # Bow instanciation
         Bow(self)
         Target(self._background)
@@ -454,18 +455,18 @@ class PauseContext:
     '''
     The PauseContext is just a layer drawn over the game when it's paused.
     '''
-    COLOR_BG = (255, 255, 255, 90)
+    COLOR_BG = (0, 0, 0, 60)
 
     def __init__(self, screen):
         self._screen = screen
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), 
                                           flags=pygame.SRCALPHA)
-        self._big_font = pygame.font.Font(None, 80)
-        self._small_font = pygame.font.Font(None, 55)
+        self._big_font = pygame.font.Font(FONT_NAME, 80)
+        self._small_font = pygame.font.Font(FONT_NAME, 55)
         # drawing layer
         self._background.fill(PauseContext.COLOR_BG)
         pause_text = "P . A . U . S . E"
-        instruction_text = "press ES.CA.PE to resume"
+        instruction_text = "press ESCAPE to resume"
         pause_surface = self._big_font.render(pause_text,
                                               False,
                                               COLOR_FONT)
@@ -486,6 +487,42 @@ class PauseContext:
                     self._drawn = False
                     return "Game"
 
+
+class MenuContext:
+    '''
+    The MenuContext is the central hub for the user to chose options from.
+    It redirects the player to a new game, or a list of high scores, ...
+    '''
+    
+    def __init__(self, screen):
+        self._screen = screen
+        self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._big_font = pygame.font.Font(None, 80)
+        self._small_font = pygame.font.Font(None, 55)
+        # drawing layer
+#        self._background.fill(PauseContext.COLOR_BG)
+#        pause_text = "P . A . U . S . E"
+#        instruction_text = "press ESCAPE to resume"
+#        pause_surface = self._big_font.render(pause_text,
+#                                              False,
+#                                              COLOR_FONT)
+#        instruction_surface = self._small_font.render(instruction_text,
+#                                                      False,
+#                                                      COLOR_FONT)
+#        self._background.blit(pause_surface, (40, 40))
+#        self._background.blit(instruction_surface, (40, 200))
+        self._drawn = False
+
+    def update(self, inputs):
+        # draw
+        if not self._drawn:
+            pass
+        # inputs
+        #   up/down: change cursor
+        #   enter: select option
+        for an_input in inputs:
+            pass
+        pass
 
 def iddle_sprite(img, pos, background):
     '''
