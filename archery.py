@@ -493,36 +493,56 @@ class MenuContext:
     The MenuContext is the central hub for the user to chose options from.
     It redirects the player to a new game, or a list of high scores, ...
     '''
+
+    # TODO:
+    #    * class method pos_option(i), pos_cursor(i) 
+    #    * créer img_cursor dans GIMP
+    #    * charger img_cursor dans la classe
+    IMG = pygame.image.load('resources/main_menu.png')
+    COLOR_FONT = (0, 0, 0)
+    Option = namedtuple('Option', 'string instruction')
     
     def __init__(self, screen):
         self._screen = screen
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._big_font = pygame.font.Font(None, 80)
         self._small_font = pygame.font.Font(None, 55)
+        # options
+        option_play = Option('Play', 'Game New')
+        option_quit = Option('Quit', 'Quit')
+        self._options = option_play, option_quit
+        # cursor
+        # load img self._cursor_img = ...
+        self._cursor_pos = 0
         # drawing layer
-#        self._background.fill(PauseContext.COLOR_BG)
-#        pause_text = "P . A . U . S . E"
-#        instruction_text = "press ESCAPE to resume"
-#        pause_surface = self._big_font.render(pause_text,
-#                                              False,
-#                                              COLOR_FONT)
-#        instruction_surface = self._small_font.render(instruction_text,
-#                                                      False,
-#                                                      COLOR_FONT)
-#        self._background.blit(pause_surface, (40, 40))
-#        self._background.blit(instruction_surface, (40, 200))
+        self._background = draw_background((200, 240), 8)
+        self._background.blit(MenuContext.IMG, (0, 0))
+        # write options 
+        for i, option in enumerate(self._options):
+            option_surf = self._small_font.render(option.string,
+                                                  False,
+                                                  MenuContext.COLOR_FONT)
+            self._background.blit(option_surf,
+                                  MenuContext.pos_option(i))
         self._drawn = False
 
     def update(self, inputs):
         # draw
         if not self._drawn:
-            pass
+            self._screen.blit(self._background, (0, 0))
         # inputs
         #   up/down: change cursor
         #   enter: select option
         for an_input in inputs:
-            pass
-        pass
+            if an_input.type == pygame.KEYDOWN:
+                if an_input.key == pygame.K_DOWN:
+                    self._cursor_pos = (self._cursor_pos + 1) % len(self._options)
+                elif an_input.key == pygame.K_UP:
+                    self._cursor_pos = (self._cursor_pos - 1) % len(self._options)
+                elif an_input.key == pygame.K_ENTER:
+                    option = self._options[self._cursor_pos]
+                    return option.instruction
+
 
 def iddle_sprite(img, pos, background):
     '''
@@ -572,6 +592,8 @@ def draw_background(size, sky_stripes=1):
             current_color, counter = darken_color(COLOR_GRASS, current_color, counter)
             px_array[i, j] = current_color
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    # convert to screen pixel format
+    background = background.convert()
     return background
 
 
