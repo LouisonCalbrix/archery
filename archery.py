@@ -5,9 +5,23 @@
 # author: Louison Calbrix
 # date: December 2019
 
+# 17/01: TODO: 
+#   * docstrings for GameContext, PauseContext and MenuContext
+#   * class initializers for GameContext, PauseContext and MenuContext
+#     to set class constant screen
+#   * get rid of hard coded value in MenuContext with meaningful class constants
+#   * redo PauseContext so it ressembles a menu with options:
+#     resume, back to menu
+#   * change menu font color
+#   * change all font renders to be antialiased
+#   * 
+#   * 
+#   * 
+
 import os
 import pygame
 import random
+from collections import namedtuple
 
 #----------constants
 
@@ -19,11 +33,11 @@ COLOR_SKY = (80, 80, 200)
 COLOR_GRASS = (70, 200, 70)
 COLOR_FONT = (0, 255, 40)
 COLOR_ROPE = (180, 180, 180)
-FONT_NAME = "resources/CloisterBlack.ttf"
+FONT_NAME = 'resources/CloisterBlack.ttf'
 
 # game score
 SCORE_TABLE = [3, 2, 1]
-# game "physics"
+# game 'physics'
 GRAVITY = 3
 
 
@@ -392,6 +406,8 @@ class Target:
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
+# TODO: initialiser les classes context avec screen
+
 class GameContext:
     '''
     The game context contains all the actual game logic. Its attribute are:
@@ -439,12 +455,12 @@ class GameContext:
             if an_input.type == pygame.KEYDOWN:
                 if an_input.key == pygame.K_ESCAPE:
                     self._drawn = False
-                    return "Pause"
+                    return 'Pause Switch'
 
     def update_score(self, zone, arrow):
         '''
         Update the context's score depending on the zone hit, draw the arrow
-        on the background and refresh the screen.
+        on the background and refresh the whole screen.
         '''
         self._score += SCORE_TABLE[zone]
         iddle_sprite(arrow.image, arrow.rect, self._background)
@@ -465,8 +481,8 @@ class PauseContext:
         self._small_font = pygame.font.Font(FONT_NAME, 55)
         # drawing layer
         self._background.fill(PauseContext.COLOR_BG)
-        pause_text = "P . A . U . S . E"
-        instruction_text = "press ESCAPE to resume"
+        pause_text = 'P . A . U . S . E'
+        instruction_text = 'press ESCAPE to resume'
         pause_surface = self._big_font.render(pause_text,
                                               False,
                                               COLOR_FONT)
@@ -485,7 +501,7 @@ class PauseContext:
             if an_input.type == pygame.KEYDOWN:
                 if an_input.key == pygame.K_ESCAPE:
                     self._drawn = False
-                    return "Game"
+                    return 'Game Switch'
 
 
 class MenuContext:
@@ -493,56 +509,85 @@ class MenuContext:
     The MenuContext is the central hub for the user to chose options from.
     It redirects the player to a new game, or a list of high scores, ...
     '''
-
-    # TODO:
-    #    * class method pos_option(i), pos_cursor(i) 
-    #    * créer img_cursor dans GIMP
-    #    * charger img_cursor dans la classe
+    IMG_CURSOR = pygame.image.load('resources/cursor.png')
     IMG = pygame.image.load('resources/main_menu.png')
-    COLOR_FONT = (0, 0, 0)
     Option = namedtuple('Option', 'string instruction')
     
     def __init__(self, screen):
         self._screen = screen
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self._big_font = pygame.font.Font(None, 80)
-        self._small_font = pygame.font.Font(None, 55)
+        self._big_font = pygame.font.Font(FONT_NAME, 80)
+        self._small_font = pygame.font.Font(FONT_NAME, 55)
         # options
-        option_play = Option('Play', 'Game New')
-        option_quit = Option('Quit', 'Quit')
+        option_play = MenuContext.Option('Play', 'Game New')
+        option_quit = MenuContext.Option('Quit', 'Quit Switch')
         self._options = option_play, option_quit
         # cursor
         # load img self._cursor_img = ...
-        self._cursor_pos = 0
+        self._cursor = 0
         # drawing layer
         self._background = draw_background((200, 240), 8)
         self._background.blit(MenuContext.IMG, (0, 0))
         # write options 
         for i, option in enumerate(self._options):
             option_surf = self._small_font.render(option.string,
-                                                  False,
-                                                  MenuContext.COLOR_FONT)
+                                                  True,
+                                                  COLOR_FONT)
             self._background.blit(option_surf,
-                                  MenuContext.pos_option(i))
+                                  self.pos_option(i))
+        title_surf = self._big_font.render('Archery',
+                                           True,
+                                           COLOR_FONT)
+        self._background.blit(title_surf,
+                              self.pos_option(-1))
         self._drawn = False
 
     def update(self, inputs):
         # draw
         if not self._drawn:
             self._screen.blit(self._background, (0, 0))
+            self._drawn = True
+            self._screen.blit(MenuContext.IMG_CURSOR, 
+                              self.pos_cursor(self._cursor))
         # inputs
         #   up/down: change cursor
         #   enter: select option
         for an_input in inputs:
             if an_input.type == pygame.KEYDOWN:
                 if an_input.key == pygame.K_DOWN:
-                    self._cursor_pos = (self._cursor_pos + 1) % len(self._options)
+                    self._cursor = (self._cursor + 1) % len(self._options)
                 elif an_input.key == pygame.K_UP:
-                    self._cursor_pos = (self._cursor_pos - 1) % len(self._options)
-                elif an_input.key == pygame.K_ENTER:
-                    option = self._options[self._cursor_pos]
+                    self._cursor = (self._cursor - 1) % len(self._options)
+                elif an_input.key == pygame.K_RETURN:
+                    option = self._options[self._cursor]
                     return option.instruction
+                self._drawn = False
 
+    #staticmethod
+    def pos_option(self, i):
+        x = 2 * SCREEN_WIDTH // 3
+        if i == -1:
+            y = SCREEN_HEIGHT // 4
+        else:
+            y = SCREEN_HEIGHT // 2 + 70 * i
+        return x, y
+
+    #staticmethod
+    def pos_cursor(self, i):
+        x = 2 * SCREEN_WIDTH // 3 - 60
+        y = SCREEN_HEIGHT // 2 + 70 * i + 10
+        return x, y
+
+
+# QuitContext looks like a Context but just exit the game
+DummyContext = namedtuple('DummyContext', 'update')
+def quit_func(*args):
+    '''
+    function called by dummy QuitContext to exit the game
+    '''
+    pygame.quit()
+    quit()
+QuitContext = DummyContext(quit_func)
 
 def iddle_sprite(img, pos, background):
     '''
@@ -597,6 +642,17 @@ def draw_background(size, sky_stripes=1):
     return background
 
 
+def context_change(context_dict, instruction, screen):
+    change, option = instruction.split(' ')
+    if option == 'Switch':
+        new_context = context_dict[change].instance
+    elif option == 'New':
+        context_class = context_dict[change].cont_class
+        new_instance = context_class(screen)
+        context_dict[change] = ContextEntry(context_class, new_instance)
+        new_context = new_instance
+    return new_context
+
 # for test purpose
 if __name__ == '__main__':
     
@@ -611,13 +667,20 @@ if __name__ == '__main__':
     Arrow.init()
     Target.init()
     # Contexts
-    game_context = GameContext(screen)
+    ContextEntry = namedtuple('ContextEntry', 'cont_class instance')
+    menu_context = MenuContext(screen)
+    menu_entry = ContextEntry(MenuContext, menu_context)
     pause_context = PauseContext(screen)
+    pause_entry = ContextEntry(PauseContext, pause_context)
+    game_entry = ContextEntry(GameContext, None)
+    quit_entry = ContextEntry(QuitContext, QuitContext)
     context_dict = {
-        "Game": game_context,
-        "Pause": pause_context
+        'Game': game_entry,
+        'Pause': pause_entry,
+        'Menu': menu_entry,
+        'Quit': quit_entry
     }
-    active_context = game_context
+    active_context = menu_context
 
     while True:
 
@@ -625,16 +688,13 @@ if __name__ == '__main__':
         inputs = []
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
+                active_context = context_change(context_dict, 'Quit Switch', screen)
             elif event.type == pygame.KEYDOWN:
                 inputs.append(event)
             elif event.type == pygame.KEYUP:
                 inputs.append(event)
-        context_change = active_context.update(inputs)
-        if context_change:
-            active_context = context_dict[context_change]
+        context_instruction = active_context.update(inputs)
+        if context_instruction:
+            active_context = context_change(context_dict, context_instruction, screen)
         pygame.display.flip()
         clock.tick(fps)
-
-
