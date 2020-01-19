@@ -7,16 +7,11 @@
 
 # 17/01: TODO: 
 #   * docstrings for GameContext, PauseContext and MenuContext
-#   * class initializers for GameContext, PauseContext and MenuContext
-#     to set class constant screen
 #   * get rid of hard coded value in MenuContext with meaningful class constants
 #   * redo PauseContext so it ressembles a menu with options:
 #     resume, back to menu
 #   * change menu font color
-#   * change all font renders to be antialiased
-#   * 
-#   * 
-#   * 
+#   * enhance background
 
 import os
 import pygame
@@ -406,8 +401,6 @@ class Target:
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
-# TODO: initialiser les classes context avec screen
-
 class GameContext:
     '''
     The game context contains all the actual game logic. Its attribute are:
@@ -417,12 +410,11 @@ class GameContext:
         - _score: the score
         - _score_font: the font used to write out the score onscreen
     '''
-    def __init__(self, screen):
+    def __init__(self):
         '''
         Create GameContext object. During initialization, Bow and Target class
         are both instanciated.
         '''
-        self._screen =  screen
         self._background = draw_background((200, 240), 8)
         self._score = 0
         self._score_font = pygame.font.Font(FONT_NAME, 55)
@@ -433,22 +425,22 @@ class GameContext:
 
     def update(self, inputs):
         if not self._drawn:
-            self._screen.blit(self._background, (0, 0))
+            GameContext.SCREEN.blit(self._background, (0, 0))
             self._drawn = True
         # clean up previous position
         for group in Bow.INSTANCE, Arrow.INSTANCES:
-            group.clear(self._screen, self._background)
+            group.clear(GameContext.SCREEN, self._background)
         score_surf_pos = SCREEN_WIDTH//2, 0
-        self._screen.blit(self._background, score_surf_pos,
-                          pygame.Rect(score_surf_pos, self._score_font.size(str(self._score))))
+        GameContext.SCREEN.blit(self._background, score_surf_pos,
+                                pygame.Rect(score_surf_pos, self._score_font.size(str(self._score))))
         # update bow and arrows
         Bow.INSTANCE.sprite.update(inputs)
         Arrow.INSTANCES.update()
         # draw bow and arrows
         for group in Bow.INSTANCE, Arrow.INSTANCES:
-            group.draw(self._screen)
+            group.draw(GameContext.SCREEN)
         # update score surface
-        score_surface = self._score_font.render(str(self._score), False, COLOR_FONT)
+        score_surface = self._score_font.render(str(self._score), True, COLOR_FONT)
         screen.blit(score_surface, score_surf_pos)
         # hand control to another contex
         for an_input in inputs:
@@ -464,7 +456,14 @@ class GameContext:
         '''
         self._score += SCORE_TABLE[zone]
         iddle_sprite(arrow.image, arrow.rect, self._background)
-        self._screen.blit(self._background, (0, 0))
+        GameContext.SCREEN.blit(self._background, (0, 0))
+
+    @classmethod
+    def init(cls, screen):
+        '''
+        Set the screen on which all instances of this Context will be displayed.
+        '''
+        cls.SCREEN = screen
 
 
 class PauseContext:
@@ -473,8 +472,7 @@ class PauseContext:
     '''
     COLOR_BG = (0, 0, 0, 60)
 
-    def __init__(self, screen):
-        self._screen = screen
+    def __init__(self):
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), 
                                           flags=pygame.SRCALPHA)
         self._big_font = pygame.font.Font(FONT_NAME, 80)
@@ -484,10 +482,10 @@ class PauseContext:
         pause_text = 'P . A . U . S . E'
         instruction_text = 'press ESCAPE to resume'
         pause_surface = self._big_font.render(pause_text,
-                                              False,
+                                              True,
                                               COLOR_FONT)
         instruction_surface = self._small_font.render(instruction_text,
-                                                      False,
+                                                      True,
                                                       COLOR_FONT)
         self._background.blit(pause_surface, (40, 40))
         self._background.blit(instruction_surface, (40, 200))
@@ -495,13 +493,20 @@ class PauseContext:
 
     def update(self, inputs):
         if not self._drawn:
-            self._screen.blit(self._background, (0, 0))
+            PauseContext.SCREEN.blit(self._background, (0, 0))
             self._drawn = True
         for an_input in inputs:
             if an_input.type == pygame.KEYDOWN:
                 if an_input.key == pygame.K_ESCAPE:
                     self._drawn = False
                     return 'Game Switch'
+
+    @classmethod
+    def init(cls, screen):
+        '''
+        Set the screen on which all instances of this Context will be displayed.
+        '''
+        cls.SCREEN = screen
 
 
 class MenuContext:
@@ -513,8 +518,7 @@ class MenuContext:
     IMG = pygame.image.load('resources/main_menu.png')
     Option = namedtuple('Option', 'string instruction')
     
-    def __init__(self, screen):
-        self._screen = screen
+    def __init__(self):
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._big_font = pygame.font.Font(FONT_NAME, 80)
         self._small_font = pygame.font.Font(FONT_NAME, 55)
@@ -545,10 +549,10 @@ class MenuContext:
     def update(self, inputs):
         # draw
         if not self._drawn:
-            self._screen.blit(self._background, (0, 0))
+            MenuContext.SCREEN.blit(self._background, (0, 0))
             self._drawn = True
-            self._screen.blit(MenuContext.IMG_CURSOR, 
-                              self.pos_cursor(self._cursor))
+            MenuContext.SCREEN.blit(MenuContext.IMG_CURSOR, 
+                                    self.pos_cursor(self._cursor))
         # inputs
         #   up/down: change cursor
         #   enter: select option
@@ -563,8 +567,8 @@ class MenuContext:
                     return option.instruction
                 self._drawn = False
 
-    #staticmethod
-    def pos_option(self, i):
+    @staticmethod
+    def pos_option(i):
         x = 2 * SCREEN_WIDTH // 3
         if i == -1:
             y = SCREEN_HEIGHT // 4
@@ -572,11 +576,18 @@ class MenuContext:
             y = SCREEN_HEIGHT // 2 + 70 * i
         return x, y
 
-    #staticmethod
-    def pos_cursor(self, i):
+    @staticmethod
+    def pos_cursor(i):
         x = 2 * SCREEN_WIDTH // 3 - 60
         y = SCREEN_HEIGHT // 2 + 70 * i + 10
         return x, y
+
+    @classmethod
+    def init(cls, screen):
+        '''
+        Set the screen on which all instances of this Context will be displayed.
+        '''
+        cls.SCREEN = screen
 
 
 # QuitContext looks like a Context but just exit the game
@@ -587,7 +598,7 @@ def quit_func(*args):
     '''
     pygame.quit()
     quit()
-QuitContext = DummyContext(quit_func)
+QuitContext = lambda : DummyContext(quit_func)
 
 def iddle_sprite(img, pos, background):
     '''
@@ -642,13 +653,13 @@ def draw_background(size, sky_stripes=1):
     return background
 
 
-def context_change(context_dict, instruction, screen):
+def context_change(context_dict, instruction):
     change, option = instruction.split(' ')
     if option == 'Switch':
         new_context = context_dict[change].instance
     elif option == 'New':
         context_class = context_dict[change].cont_class
-        new_instance = context_class(screen)
+        new_instance = context_class()
         context_dict[change] = ContextEntry(context_class, new_instance)
         new_context = new_instance
     return new_context
@@ -666,21 +677,24 @@ if __name__ == '__main__':
     Bow.init(fps)
     Arrow.init()
     Target.init()
-    # Contexts
+    # Contexts initialization
+    MenuContext.init(screen)
+    PauseContext.init(screen)
+    GameContext.init(screen)
+    # Contexts instanciation
     ContextEntry = namedtuple('ContextEntry', 'cont_class instance')
-    menu_context = MenuContext(screen)
-    menu_entry = ContextEntry(MenuContext, menu_context)
-    pause_context = PauseContext(screen)
-    pause_entry = ContextEntry(PauseContext, pause_context)
+    menu_entry = ContextEntry(MenuContext, MenuContext())
+    pause_entry = ContextEntry(PauseContext, PauseContext())
     game_entry = ContextEntry(GameContext, None)
-    quit_entry = ContextEntry(QuitContext, QuitContext)
+    quit_entry = ContextEntry(QuitContext, QuitContext())
+    # Context dict that keeps track of all the contexts
     context_dict = {
         'Game': game_entry,
         'Pause': pause_entry,
         'Menu': menu_entry,
         'Quit': quit_entry
     }
-    active_context = menu_context
+    active_context = context_dict['Menu'].instance
 
     while True:
 
@@ -688,13 +702,13 @@ if __name__ == '__main__':
         inputs = []
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                active_context = context_change(context_dict, 'Quit Switch', screen)
+                active_context = context_change(context_dict, 'Quit Switch')
             elif event.type == pygame.KEYDOWN:
                 inputs.append(event)
             elif event.type == pygame.KEYUP:
                 inputs.append(event)
         context_instruction = active_context.update(inputs)
         if context_instruction:
-            active_context = context_change(context_dict, context_instruction, screen)
+            active_context = context_change(context_dict, context_instruction)
         pygame.display.flip()
         clock.tick(fps)
