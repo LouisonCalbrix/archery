@@ -17,6 +17,7 @@ import os
 import pygame
 import random
 from collections import namedtuple
+from abc import ABC, abstractmethod
 
 #----------constants
 
@@ -401,7 +402,19 @@ class Target:
         cls.IMG.set_colorkey(cls.IMG.get_at((0, 0)))
 
 
-class GameContext:
+class Context(ABC):
+    '''
+    Base class for every context in the application.
+    '''
+    @abstractmethod
+    def update(self, inputs):
+        pass
+
+    @classmethod
+    def init(cls, screen):
+        cls.SCREEN = screen
+
+class GameContext(Context):
     '''
     The game context contains all the actual game logic. Its attribute are:
         - _screen: the application's display surface on which the game is drawn
@@ -458,15 +471,8 @@ class GameContext:
         iddle_sprite(arrow.image, arrow.rect, self._background)
         GameContext.SCREEN.blit(self._background, (0, 0))
 
-    @classmethod
-    def init(cls, screen):
-        '''
-        Set the screen on which all instances of this Context will be displayed.
-        '''
-        cls.SCREEN = screen
 
-
-class PauseContext:
+class PauseContext(Context):
     '''
     The PauseContext is just a layer drawn over the game when it's paused.
     '''
@@ -501,15 +507,8 @@ class PauseContext:
                     self._drawn = False
                     return 'Game Switch'
 
-    @classmethod
-    def init(cls, screen):
-        '''
-        Set the screen on which all instances of this Context will be displayed.
-        '''
-        cls.SCREEN = screen
 
-
-class MenuContext:
+class MenuContext(Context):
     '''
     The MenuContext is the central hub for the user to chose options from.
     It redirects the player to a new game, or a list of high scores, ...
@@ -581,13 +580,6 @@ class MenuContext:
         x = 2 * SCREEN_WIDTH // 3 - 60
         y = SCREEN_HEIGHT // 2 + 70 * i + 10
         return x, y
-
-    @classmethod
-    def init(cls, screen):
-        '''
-        Set the screen on which all instances of this Context will be displayed.
-        '''
-        cls.SCREEN = screen
 
 
 # QuitContext looks like a Context but just exit the game
