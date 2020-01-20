@@ -408,10 +408,19 @@ class Context(ABC):
     '''
     @abstractmethod
     def update(self, inputs):
+        '''
+        Every subclass needs to implement this. It is meant to handle inputs
+        from user and modify the Context's state accordingly.
+        '''
         pass
 
     @classmethod
     def init(cls, screen):
+        '''
+        Initialize the Context subclass. It sets the value for the class
+        attribute SCREEN which should be used to blit anything onscreen for the
+        user to see.
+        '''
         cls.SCREEN = screen
 
 class GameContext(Context):
@@ -507,6 +516,106 @@ class PauseContext(Context):
                     self._drawn = False
                     return 'Game Switch'
 
+
+class CustomMenu(Context):
+    '''
+    Customizable Menu.
+    '''
+
+    COLOR_DEFAULT = (255, 255, 255, 90)
+    IMG_CURSOR = pygame.image.load('resources/cursor.png')
+    Option = namedtuple('Option', 'name instruction')
+
+    def __init__(self, title, option_dict, font_sizes=(80, 55), bkgd_img=None):
+        '''
+        Create a Menu whose title is gonna be written in big letters in the
+        upper right corner.
+        option_dict must be a dict of name: instruction with:
+            - name being the option's name as a string that will be 
+              written on screen
+            - instruction being a string of two words indicating what action
+              to do when the option is selected.
+        bkgd_img is a background image for the menu, if not provided the menu's
+        representation onscreen will just be the render of its title, its
+        options, a cursor, and a slightly opaque solid color as a background.
+        '''
+        self._title = title
+        # initialize options
+        self._options = tuple(CustomMenu.Option(k, i) for k, i in option_dict.items())
+        # initialize cursor 
+        self._cursor = 0
+
+        # initialize background
+        self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # blit bkgd_img
+        if bkgd_img:
+            bkgd_size = bkgd_img.get_size()
+            if bkgd_size != (SCREEN_WIDTH, SCREEN_HEIGHT):
+                # center
+                pass
+            else:
+                self._background.blit(bkgd_img, (0, 0))
+        # draw a rectangle over the whole screen as a background
+        else:
+            pygame.draw.rect(self._background,
+                             CustomMenu.COLOR_DEFAULT,
+                             pygame.Rect((0, 0), self._background.get_size()))
+        # write options and title over background
+        bigfont_size, smallfont_size = font_sizes
+        for i, option in enumerate(self._options):
+            small_font = pygame.font.Font(FONT_NAME, smallfont_size)
+            option_surf = small_font.render(option.name,
+                                            True,
+                                            COLOR_FONT)
+            self._background.blit(option_surf,
+                                  self.pos_option(i))
+        big_font = pygame.font.Font(FONT_NAME, bigfont_size)
+        title_surf = big_font.render('Archery',
+                                     True,
+                                     COLOR_FONT)
+        self._background.blit(title_surf,
+                              self.pos_option(-1))
+        # _drawn indicates if the display needs to be refreshed
+        self._drawn = False
+
+    def update(self, inputs):
+        # draw
+        if not self._drawn:
+            CustomMenu.SCREEN.blit(self._background, (0, 0))
+            self._drawn = True
+            CustomMenu.SCREEN.blit(ContextMenu.IMG_CURSOR,
+                                   self.pos_cursor(self._cursor))
+        # inputs
+        for an_input in inputs:
+            if an_input.type == pygame.KEYDOWN:
+                if an_input.key == pygame.K_DOWN:
+                    self._cursor = (self._cursor + 1) % len(self._options)
+                elif an_input.key == pygame.K_UP:
+                    self._cursor = (self._cursor - 1) % len(self._options)
+                elif an_input.key == pygame.K_RETURN:
+                    option = self._options[self._cursor]
+                    return option.instruction
+                self._drawn = False
+
+    @staticmethod
+    def pos_option(i):
+        x = 2 * SCREEN_WIDTH // 3
+        if i == -1:
+            y = SCREEN_HEIGHT // 4
+        else:
+            y = SCREEN_HEIGHT // 2 + 70 * i
+        return x, y
+
+    @staticmethod
+    def pos_cursor(i):
+        x = 2 * SCREEN_WIDTH // 3 - 60
+        y = SCREEN_HEIGHT // 2 + 70 * i + 10
+        return x, y
+        pass
+
+    @property
+    def title(self):
+        return self._title
 
 class MenuContext(Context):
     '''
