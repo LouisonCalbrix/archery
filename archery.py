@@ -583,11 +583,12 @@ class CustomMenu(Context):
         if not self._drawn:
             CustomMenu.SCREEN.blit(self._background, (0, 0))
             self._drawn = True
-            CustomMenu.SCREEN.blit(ContextMenu.IMG_CURSOR,
+            CustomMenu.SCREEN.blit(CustomMenu.IMG_CURSOR,
                                    self.pos_cursor(self._cursor))
         # inputs
         for an_input in inputs:
             if an_input.type == pygame.KEYDOWN:
+                self._drawn = False
                 if an_input.key == pygame.K_DOWN:
                     self._cursor = (self._cursor + 1) % len(self._options)
                 elif an_input.key == pygame.K_UP:
@@ -595,7 +596,6 @@ class CustomMenu(Context):
                 elif an_input.key == pygame.K_RETURN:
                     option = self._options[self._cursor]
                     return option.instruction
-                self._drawn = False
 
     @staticmethod
     def pos_option(i):
@@ -802,10 +802,11 @@ if __name__ == '__main__':
     MenuContext.init(screen)
     PauseContext.init(screen)
     GameContext.init(screen)
+    CustomMenu.init(screen)
     # Contexts instanciation
     ContextEntry = namedtuple('ContextEntry', 'cont_class instance')
-    menu_entry = ContextEntry(MenuContext, MenuContext())
-    pause_entry = ContextEntry(PauseContext, PauseContext())
+    menu_entry = ContextEntry(CustomMenu.MainMenu, CustomMenu.MainMenu())
+    pause_entry = ContextEntry(CustomMenu.Pause, CustomMenu.Pause())
     game_entry = ContextEntry(GameContext, None)
     quit_entry = ContextEntry(QuitContext, QuitContext())
     # Context dict that keeps track of all the contexts
