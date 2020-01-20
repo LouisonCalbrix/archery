@@ -526,7 +526,7 @@ class CustomMenu(Context):
     IMG_CURSOR = pygame.image.load('resources/cursor.png')
     Option = namedtuple('Option', 'name instruction')
 
-    def __init__(self, title, option_dict, font_sizes=(80, 55), bkgd_img=None):
+    def __init__(self, title, option_dict, font_sizes=(80, 55), background=None):
         '''
         Create a Menu whose title is gonna be written in big letters in the
         upper right corner.
@@ -535,7 +535,7 @@ class CustomMenu(Context):
               written on screen
             - instruction being a string of two words indicating what action
               to do when the option is selected.
-        bkgd_img is a background image for the menu, if not provided the menu's
+        background is a background image for the menu, if not provided the menu's
         representation onscreen will just be the render of its title, its
         options, a cursor, and a slightly opaque solid color as a background.
         '''
@@ -547,14 +547,14 @@ class CustomMenu(Context):
 
         # initialize background
         self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        # blit bkgd_img
-        if bkgd_img:
-            bkgd_size = bkgd_img.get_size()
+        # blit background
+        if background:
+            bkgd_size = background.get_size()
             if bkgd_size != (SCREEN_WIDTH, SCREEN_HEIGHT):
                 # center
                 pass
             else:
-                self._background.blit(bkgd_img, (0, 0))
+                self._background.blit(background, (0, 0))
         # draw a rectangle over the whole screen as a background
         else:
             pygame.draw.rect(self._background,
@@ -616,6 +616,26 @@ class CustomMenu(Context):
     @property
     def title(self):
         return self._title
+
+    @classmethod
+    def MainMenu(cls):
+        title = 'Archery'
+        option_dict = {
+            'Play': 'Game New',
+            'Quit': 'Quit Switch'
+        }
+        img = pygame.image.load('resources/main_menu.png')
+        return cls(title, option_dict, background=img)
+
+    @classmethod
+    def Pause(cls):
+        title = 'Pause'
+        option_dict = {
+            'Resume': 'Game Switch',
+            'Menu': 'Menu Switch',
+            'Quit': 'Quit Switch'
+        }
+        return cls(title, option_dict)
 
 class MenuContext(Context):
     '''
