@@ -10,6 +10,7 @@
 #   * get rid of hard coded value in MenuContext with meaningful class constants
 #   * change menu font color
 #   * enhance background
+#   * old parchemin for menu options
 
 import os
 import pygame
@@ -421,6 +422,7 @@ class Context(ABC):
         '''
         cls.SCREEN = screen
 
+
 class GameContext(Context):
     '''
     The game context contains all the actual game logic. Its attribute are:
@@ -479,42 +481,6 @@ class GameContext(Context):
         GameContext.SCREEN.blit(self._background, (0, 0))
 
 
-class PauseContext(Context):
-    '''
-    The PauseContext is just a layer drawn over the game when it's paused.
-    '''
-    COLOR_BG = (0, 0, 0, 60)
-
-    def __init__(self):
-        self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), 
-                                          flags=pygame.SRCALPHA)
-        self._big_font = pygame.font.Font(FONT_NAME, 80)
-        self._small_font = pygame.font.Font(FONT_NAME, 55)
-        # drawing layer
-        self._background.fill(PauseContext.COLOR_BG)
-        pause_text = 'P . A . U . S . E'
-        instruction_text = 'press ESCAPE to resume'
-        pause_surface = self._big_font.render(pause_text,
-                                              True,
-                                              COLOR_FONT)
-        instruction_surface = self._small_font.render(instruction_text,
-                                                      True,
-                                                      COLOR_FONT)
-        self._background.blit(pause_surface, (40, 40))
-        self._background.blit(instruction_surface, (40, 200))
-        self._drawn = False
-
-    def update(self, inputs):
-        if not self._drawn:
-            PauseContext.SCREEN.blit(self._background, (0, 0))
-            self._drawn = True
-        for an_input in inputs:
-            if an_input.type == pygame.KEYDOWN:
-                if an_input.key == pygame.K_ESCAPE:
-                    self._drawn = False
-                    return 'Game Switch'
-
-
 class CustomMenu(Context):
     '''
     Customizable Menu.
@@ -560,8 +526,10 @@ class CustomMenu(Context):
 
         # write options and title over background
         bigfont_size, smallfont_size = font_sizes
+        small_font = pygame.font.Font(FONT_NAME, smallfont_size)
+        self._smallfont_size = small_font.get_linesize()
+        big_font = pygame.font.Font(FONT_NAME, bigfont_size)
         for i, option in enumerate(self._options):
-            small_font = pygame.font.Font(FONT_NAME, smallfont_size)
             option_surf = small_font.render(option.name,
                                             True,
                                             COLOR_FONT)
@@ -569,7 +537,6 @@ class CustomMenu(Context):
             option_rect = self.center_rect(option_rect, i)
             self._background.blit(option_surf,
                                   option_rect)
-        big_font = pygame.font.Font(FONT_NAME, bigfont_size)
         title_surf = big_font.render('Archery',
                                      True,
                                      COLOR_FONT)
@@ -591,15 +558,27 @@ class CustomMenu(Context):
         for an_input in inputs:
             if an_input.type == pygame.KEYDOWN:
                 if an_input.key == pygame.K_DOWN:
-                    # self._cursor = (self._cursor + 1) % len(self._options)
                     self.cursor += 1
                 elif an_input.key == pygame.K_UP:
                     self.cursor -= 1
-                    # self._cursor = (self._cursor - 1) % len(self._options)
                 elif an_input.key == pygame.K_RETURN:
                     self._drawn = False
                     option = self._options[self._cursor]
                     return option.instruction
+
+    def center_rect(self, rect, pos_i, rect_type='option'):
+        if rect_type == 'option':
+            x = 2 * SCREEN_WIDTH // 3
+        elif rect_type == 'cursor':
+            x = 2 * SCREEN_WIDTH // 3 - (CustomMenu.CURSOR_SIZE + CustomMenu.MARGIN_SIZE)
+        # title position
+        if pos_i == -1:
+            y = SCREEN_HEIGHT // 5
+        else:
+            y = SCREEN_HEIGHT // 2 + (self._smallfont_size+CustomMenu.MARGIN_SIZE) * pos_i
+        rect.x = x
+        rect.centery = y
+        return rect
 
     def delete_cursor(self):
         cursor_rect = CustomMenu.IMG_CURSOR.get_rect()
@@ -614,36 +593,19 @@ class CustomMenu(Context):
         CustomMenu.SCREEN.blit(CustomMenu.IMG_CURSOR,
                                cursor_rect)
 
-    @staticmethod
-    def center_rect(rect, pos_i, rect_type='option'):
-        if rect_type == 'option':
-            x = 2 * SCREEN_WIDTH // 3
-        elif rect_type == 'cursor':
-            x = 2 * SCREEN_WIDTH // 3 - 60
-        if pos_i == -1:
-            y = SCREEN_HEIGHT // 5
-        else:
-            y = SCREEN_HEIGHT // 2 + 70 * pos_i
-        rect.x = x
-        rect.centery = y
-        return rect
-
-    @property
-    def title(self):
-        return self._title
-
     @property
     def cursor(self):
         return self._cursor
 
     @cursor.setter
     def cursor(self, value):
-        # PROBLEM: change pos_cursor to return a rect
         self.delete_cursor()
-        # change value
         self._cursor = value % len(self._options)
-        # blit
         self.draw_cursor()
+
+    @property
+    def title(self):
+        return self._title
 
     # Factory methods
 
@@ -669,78 +631,12 @@ class CustomMenu(Context):
         }
         return cls(title, option_dict)
 
-class MenuContext(Context):
-    '''
-    The MenuContext is the central hub for the user to chose options from.
-    It redirects the player to a new game, or a list of high scores, ...
-    '''
-    IMG_CURSOR = pygame.image.load('resources/cursor.png')
-    IMG = pygame.image.load('resources/main_menu.png')
-    Option = namedtuple('Option', 'string instruction')
-    
-    def __init__(self):
-        self._background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        self._big_font = pygame.font.Font(FONT_NAME, 80)
-        self._small_font = pygame.font.Font(FONT_NAME, 55)
-        # options
-        option_play = MenuContext.Option('Play', 'Game New')
-        option_quit = MenuContext.Option('Quit', 'Quit Switch')
-        self._options = option_play, option_quit
-        # cursor
-        # load img self._cursor_img = ...
-        self._cursor = 0
-        # drawing layer
-        self._background = draw_background((200, 240), 8)
-        self._background.blit(MenuContext.IMG, (0, 0))
-        # write options 
-        for i, option in enumerate(self._options):
-            option_surf = self._small_font.render(option.string,
-                                                  True,
-                                                  COLOR_FONT)
-            self._background.blit(option_surf,
-                                  self.pos_option(i))
-        title_surf = self._big_font.render('Archery',
-                                           True,
-                                           COLOR_FONT)
-        self._background.blit(title_surf,
-                              self.pos_option(-1))
-        self._drawn = False
-
-    def update(self, inputs):
-        # draw
-        if not self._drawn:
-            MenuContext.SCREEN.blit(self._background, (0, 0))
-            self._drawn = True
-            MenuContext.SCREEN.blit(MenuContext.IMG_CURSOR, 
-                                    self.pos_cursor(self._cursor))
-        # inputs
-        #   up/down: change cursor
-        #   enter: select option
-        for an_input in inputs:
-            if an_input.type == pygame.KEYDOWN:
-                if an_input.key == pygame.K_DOWN:
-                    self._cursor = (self._cursor + 1) % len(self._options)
-                elif an_input.key == pygame.K_UP:
-                    self._cursor = (self._cursor - 1) % len(self._options)
-                elif an_input.key == pygame.K_RETURN:
-                    option = self._options[self._cursor]
-                    return option.instruction
-                self._drawn = False
-
-    @staticmethod
-    def pos_option(i):
-        x = 2 * SCREEN_WIDTH // 3
-        if i == -1:
-            y = SCREEN_HEIGHT // 4
-        else:
-            y = SCREEN_HEIGHT // 2 + 70 * i
-        return x, y
-
-    @staticmethod
-    def pos_cursor(i):
-        x = 2 * SCREEN_WIDTH // 3 - 60
-        y = SCREEN_HEIGHT // 2 + 70 * i + 10
-        return x, y
+    # class initializer
+    @classmethod
+    def init(cls, screen):
+        super().init(screen)
+        cls.CURSOR_SIZE = CustomMenu.IMG_CURSOR.get_size()[0]
+        cls.MARGIN_SIZE = 15
 
 
 # QuitContext looks like a Context but just exit the game
@@ -752,6 +648,7 @@ def quit_func(*args):
     pygame.quit()
     quit()
 QuitContext = lambda : DummyContext(quit_func)
+
 
 def iddle_sprite(img, pos, background):
     '''
@@ -805,7 +702,6 @@ def draw_background(size, sky_stripes=1):
     background = background.convert()
     return background
 
-
 def context_change(context_dict, instruction):
     change, option = instruction.split(' ')
     if option == 'Switch':
@@ -831,8 +727,6 @@ if __name__ == '__main__':
     Arrow.init()
     Target.init()
     # Contexts initialization
-    MenuContext.init(screen)
-    PauseContext.init(screen)
     GameContext.init(screen)
     CustomMenu.init(screen)
     # Contexts instanciation
