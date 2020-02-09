@@ -5,13 +5,6 @@
 # author: Louison Calbrix
 # date: December 2019
 
-# 17/01: TODO: 
-#   * docstrings for GameContext, PauseContext and MenuContext
-#   * get rid of hard coded value in MenuContext with meaningful class constants
-#   * change menu font color
-#   * enhance background
-#   * old parchemin for menu options
-
 import os
 import pygame
 import random
@@ -489,7 +482,7 @@ class CustomMenu(Context):
     '''
 
     COLOR_DEFAULT = (255, 255, 255, 90)
-    IMG_CURSOR = pygame.image.load('resources/cursor.png')
+    IMG_CURSOR = pygame.image.load('resources/cursor2.png')
     Option = namedtuple('Option', 'name instruction')
     # to be initialized
     MARGIN_SIZE = 0   
@@ -757,7 +750,10 @@ if __name__ == '__main__':
     
     # pygame init
     pygame.init()
+    icon = pygame.image.load('resources/icon.png')
+    pygame.display.set_icon(icon)
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption('Archery')
     clock = pygame.time.Clock()
     fps = 30
 
