@@ -1,4 +1,4 @@
-![Archery Banner](resources/logo.png)
+![Archery Banner](resources/banner.png)
 
 Written by Louison Calbrix
 
