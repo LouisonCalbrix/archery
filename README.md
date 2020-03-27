@@ -1,5 +1,7 @@
 ![Archery Banner](resources/logo.png)
+
 Written by Louison Calbrix
+
 The Game
 ==========
 
