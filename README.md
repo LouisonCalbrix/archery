@@ -21,7 +21,7 @@ Navigate menus
 In game
 |Action|Key   |
 |:-----|:-----|
-|bend bow| keep space bar pressed|
+|bend bow| press space bar|
 |shoot arrow| release space bar|
 |pause game| escape|
 
@@ -31,9 +31,9 @@ How to play
 ### Requirements
 
 This game was developped using python3.5 and pygame 1.9.6. You will need both of these to run it. Here are informations about how to install Python, and the pygame module on your machine.      
-[How to install Python on Windows](https://docs.python.org/3/using/windows.html)      
-[How to install Python on Unix Platforms](https://docs.python.org/3/using/unix.html#getting-and-installing-the-latest-version-of-python)      
-[How to install Python on Mac](https://docs.python.org/3/using/mac.html#getting-and-installing-macpython)      
+* [How to install Python on Windows](https://docs.python.org/3/using/windows.html)      
+* [How to install Python on Unix Platforms](https://docs.python.org/3/using/unix.html#getting-and-installing-the-latest-version-of-python)      
+* [How to install Python on Mac](https://docs.python.org/3/using/mac.html#getting-and-installing-macpython)      
 
 To install pygame type the following command in your terminal:     
 ```pip3 install --user pygame```      
